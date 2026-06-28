@@ -20,6 +20,12 @@ urlpatterns = [
     path('clear-toast/', views.clear_toast_view, name='clear-toast'),
     path('triage/', views.triage_view, name='triage'),
     path('triage/<int:item_id>/process/', views.process_triage_view, name='process-triage'),
+    
+    # V4.0 Planner Routes
+    path('planner/', views.planner_view, name='planner'),
+    path('planner/parse-nl/', views.planner_parse_nl_view, name='planner-parse-nl'),
+    path('planner/toggle-blocking/<int:event_id>/', views.planner_toggle_blocking_view, name='planner-toggle-blocking'),
+    
     path('settings/', views.settings_view, name='settings'),
     path('settings/backup/', views.backup_view, name='backup'),
     path('settings/domain/add/', views.domain_add_view, name='domain-add'),

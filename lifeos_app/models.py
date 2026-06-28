@@ -50,6 +50,22 @@ class AppSettings(models.Model):
     timezone = models.CharField(max_length=100, default='UTC')
     dashboard_card_names = models.JSONField(default=dict, blank=True) # User custom labels for dashboard cards
 
+    # V4.0 SLM Scheduler Settings
+    priority_weight = models.FloatField(default=1.5)
+    urgency_weight = models.FloatField(default=2.0)
+    slm_provider = models.CharField(
+        max_length=50,
+        choices=[
+            ('Local Ollama', 'Local Ollama'),
+            ('Cloud API', 'Cloud API'),
+            ('Download Llama-cpp', 'Download Llama-cpp'),
+            ('Skip', 'Skip')
+        ],
+        default='Local Ollama'
+    )
+    slm_endpoint = models.CharField(max_length=255, default='http://localhost:11434/api/generate')
+    slm_api_key = models.CharField(max_length=255, blank=True)
+
     def save(self, *args, **kwargs):
         self.pk = 1
         super().save(*args, **kwargs)
@@ -193,6 +209,13 @@ class ExecutionItem(models.Model):
         ('Critical', 'Critical'),
     ]
 
+    URGENCY_CHOICES = [
+        ('Low', 'Low'),
+        ('Normal', 'Normal'),
+        ('High', 'High'),
+        ('Immediate', 'Immediate'),
+    ]
+
     title = models.CharField(max_length=255)
     item_type = models.CharField(max_length=50, choices=ITEM_TYPES)
     is_completed = models.BooleanField(default=False, db_index=True)
@@ -223,6 +246,7 @@ class ExecutionItem(models.Model):
     # V2.0 Lifecycle status, priority, and pins
     status = models.CharField(max_length=50, choices=STATUS_CHOICES, default='Inbox', db_index=True)
     priority = models.CharField(max_length=50, choices=PRIORITY_CHOICES, default='Medium', db_index=True)
+    urgency = models.CharField(max_length=50, choices=URGENCY_CHOICES, default='Normal', db_index=True)
     is_pinned = models.BooleanField(default=False, db_index=True)
 
     # V3.0 Timeframes & Calendaring Dates
@@ -492,3 +516,49 @@ def format_seconds_to_duration(seconds):
     if rem > 0:
         parts.append(f"{rem}s")
     return " ".join(parts) if parts else "0m"
+
+
+# ==============================================================================
+# V4.0 SLM-Powered Scheduling Engine Models
+# ==============================================================================
+
+class GoogleCalendarEvent(models.Model):
+    calendar = models.ForeignKey('GoogleCalendar', on_delete=models.CASCADE, related_name='events')
+    event_id = models.CharField(max_length=255, unique=True)
+    title = models.CharField(max_length=255)
+    start_time = models.DateTimeField()
+    end_time = models.DateTimeField()
+    is_blocking = models.BooleanField(default=True)
+    
+    def __str__(self):
+        return f"{self.title} ({self.start_time} - {self.end_time})"
+
+
+class TimeAvailabilityBlock(models.Model):
+    name = models.CharField(max_length=255)
+    domain = models.ForeignKey(DomainCategory, on_delete=models.SET_NULL, null=True, blank=True)
+    
+    day_monday = models.BooleanField(default=True)
+    day_tuesday = models.BooleanField(default=True)
+    day_wednesday = models.BooleanField(default=True)
+    day_thursday = models.BooleanField(default=True)
+    day_friday = models.BooleanField(default=True)
+    day_saturday = models.BooleanField(default=False)
+    day_sunday = models.BooleanField(default=False)
+    
+    start_time = models.TimeField()
+    end_time = models.TimeField()
+    is_active = models.BooleanField(default=True)
+
+    def __str__(self):
+        return f"{self.name} [{self.start_time} - {self.end_time}]"
+
+
+class ScheduledTaskAllocation(models.Model):
+    execution_item = models.OneToOneField(ExecutionItem, on_delete=models.CASCADE, related_name='scheduled_allocation')
+    start_time = models.DateTimeField()
+    end_time = models.DateTimeField()
+    score_metric = models.FloatField(default=0.0)
+
+    def __str__(self):
+        return f"Allocated: {self.execution_item.title} at {self.start_time}"

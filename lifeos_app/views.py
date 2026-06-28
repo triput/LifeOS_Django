@@ -479,6 +479,23 @@ def settings_view(request):
             settings.longitude = None
 
         settings.enable_ai_scheduling = ai_sched
+        
+        # V4.0 SLM Scheduler Settings
+        pw = request.POST.get('priority_weight')
+        uw = request.POST.get('urgency_weight')
+        if pw:
+            try: settings.priority_weight = float(pw)
+            except ValueError: pass
+        if uw:
+            try: settings.urgency_weight = float(uw)
+            except ValueError: pass
+            
+        slm_prov = request.POST.get('slm_provider')
+        if slm_prov:
+            settings.slm_provider = slm_prov
+        settings.slm_endpoint = request.POST.get('slm_endpoint', settings.slm_endpoint)
+        settings.slm_api_key = request.POST.get('slm_api_key', settings.slm_api_key)
+
         settings.save()
         messages.success(request, "Settings updated successfully!")
         return redirect('settings')
@@ -1012,3 +1029,100 @@ def certification_delete_view(request, cert_id):
     cert.delete()
     messages.success(request, f"Certification '{title}' deleted.")
     return redirect('academy')
+
+
+# ==============================================================================
+# V4.0 Interactive Planner Dashboard
+# ==============================================================================
+
+def planner_view(request):
+    """
+    Renders the V4 Planner Grid featuring FullCalendar and NL input form.
+    """
+    settings = AppSettings.get_solo()
+    
+    from .models import ScheduledTaskAllocation, GoogleCalendarEvent
+    allocations = ScheduledTaskAllocation.objects.all()
+    cal_events = GoogleCalendarEvent.objects.all()
+    
+    context = {
+        'settings': settings,
+        'allocations': allocations,
+        'cal_events': cal_events,
+    }
+    return render(request, 'planner.html', context)
+
+
+def planner_parse_nl_view(request):
+    """
+    HTMX endpoint for taking natural language, parsing via SLM, and re-running the solver.
+    """
+    from django.http import HttpResponse
+    
+    if request.method == 'POST':
+        nl_text = request.POST.get('nl_text', '').strip()
+        if not nl_text:
+            return HttpResponse('<div class="text-red-500 text-sm">Please enter a task.</div>')
+            
+        from .slm_parser import parse_natural_language_constraints, SLMParseError
+        from .scheduler import generate_schedule_for_date
+        import datetime
+        from django.utils import timezone
+        
+        try:
+            # 1. Parse via SLM
+            constraints = parse_natural_language_constraints(nl_text)
+            
+            # 2. Extract into ExecutionItem
+            from .models import ExecutionItem
+            # Provide raw text as title for MVP
+            title = nl_text
+            if len(title) > 255: title = title[:252] + '...'
+            
+            new_item = ExecutionItem.objects.create(
+                title=title,
+                item_type='Task',
+                status='Planned',
+                duration_estimate=constraints.get('duration_minutes') or 30,
+                priority=constraints.get('priority') or 'Medium',
+                urgency=constraints.get('urgency') or 'Normal',
+            )
+            
+            # 3. Rerun the solver
+            target = timezone.now().date()
+            if constraints.get('target_date'):
+                try:
+                    target = datetime.datetime.strptime(constraints.get('target_date'), "%Y-%m-%d").date()
+                except ValueError:
+                    pass
+                    
+            generate_schedule_for_date(target)
+            
+            return HttpResponse(
+                f'<div class="text-green-500 text-sm font-bold bg-green-500/10 p-2 rounded border border-green-500/20 mb-2">Successfully scheduled and updated grid!</div>'
+                f'<script>setTimeout(() => window.location.reload(), 1500);</script>'
+            )
+            
+        except SLMParseError as e:
+            return HttpResponse(f'<div class="text-red-400 text-sm font-bold bg-red-500/10 p-2 rounded border border-red-500/20">SLM Engine Error: {str(e)}</div>')
+        except Exception as e:
+            return HttpResponse(f'<div class="text-red-400 text-sm font-bold bg-red-500/10 p-2 rounded border border-red-500/20">System Error: {str(e)}</div>')
+            
+    return HttpResponse('Invalid method', status=405)
+
+
+def planner_toggle_blocking_view(request, event_id):
+    """
+    Toggles the is_blocking flag on a GoogleCalendarEvent and re-runs the solver.
+    """
+    from .models import GoogleCalendarEvent
+    from .scheduler import generate_schedule_for_date
+    from django.shortcuts import get_object_or_404, redirect
+    
+    event = get_object_or_404(GoogleCalendarEvent, id=event_id)
+    event.is_blocking = not event.is_blocking
+    event.save()
+    
+    generate_schedule_for_date(event.start_time.date())
+    
+    return redirect('planner')
