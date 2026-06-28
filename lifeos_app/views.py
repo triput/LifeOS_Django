@@ -23,9 +23,10 @@ from django.contrib.auth import login as auth_login, logout as auth_logout
 from django.contrib.auth.forms import AuthenticationForm
 from django.utils import timezone
 from django.contrib import messages
+from django.core.exceptions import ValidationError
 from django.core import serializers
 
-from .models import WorkspaceContainer, ExecutionItem, AppSettings, DomainCategory, Certification, RecurringConfig, GoogleCalendar, NotionIntegration, parse_duration_to_seconds, format_seconds_to_duration
+from .models import WorkspaceContainer, ExecutionItem, AppSettings, DomainCategory, Certification, RecurringConfig, GoogleCalendar, NotionIntegration, parse_duration_to_seconds, format_seconds_to_duration, Tag
 from .telemetry import OpenMeteoAdapter, NoaaKpAdapter
 
 def login_view(request):
@@ -326,10 +327,20 @@ def clear_toast_view(request):
 
 # Inbox Triage View (FR-INBOX-002)
 def triage_view(request):
+    from django.db.models import Q
     inbox_items = ExecutionItem.objects.filter(
         status='Inbox',
         is_deleted=False,
         is_archived=False
+    ).order_by('-created_at')
+    
+    orphan_containers = WorkspaceContainer.objects.filter(
+        parent=None,
+        is_archived=False
+    ).filter(
+        Q(domain_category__isnull=True) | Q(domain_category='')
+    ).filter(
+        Q(para_category__isnull=True) | Q(para_category='')
     ).order_by('-created_at')
     
     containers = WorkspaceContainer.objects.filter(is_archived=False).order_by('container_type', 'title')
@@ -347,6 +358,7 @@ def triage_view(request):
     
     context = {
         'inbox_items': inbox_items,
+        'orphan_containers': orphan_containers,
         'containers': containers,
         'parent_tasks': parent_tasks,
         'domains': domains,
@@ -367,7 +379,13 @@ def process_triage_view(request, item_id):
         item_type = request.POST.get('item_type', 'Task')
         duration = request.POST.get('duration_estimate')
         priority = request.POST.get('priority', 'Medium')
-        status = request.POST.get('status', 'Planned')
+        
+        status = request.POST.get('status')
+        if not status:
+            if item.start_date or item.due_date:
+                status = 'Planned'
+            else:
+                status = 'Backlog'
         
         if parent_raw:
             parent_raw = str(parent_raw).strip()
@@ -417,6 +435,59 @@ def process_triage_view(request, item_id):
         if request.headers.get('HX-Request'):
             return HttpResponse("") # HTMX empty response removes element
             
+        return redirect('triage')
+    return redirect('triage')
+
+
+def process_container_triage_view(request, container_id):
+    if request.method == 'POST':
+        container = get_object_or_404(WorkspaceContainer, id=container_id)
+        parent_raw = request.POST.get('container')
+        domain = request.POST.get('domain')
+        para = request.POST.get('para')
+        
+        if parent_raw:
+            parent_raw = str(parent_raw).strip()
+            if parent_raw.startswith('container_'):
+                pid = parent_raw.split('_')[1]
+                parent_container = get_object_or_404(WorkspaceContainer, id=pid)
+                if parent_container.id != container.id:
+                    container.parent = parent_container
+            elif parent_raw.isdigit():
+                parent_container = get_object_or_404(WorkspaceContainer, id=parent_raw)
+                if parent_container.id != container.id:
+                    container.parent = parent_container
+        
+        if domain:
+            try:
+                dom_cat = DomainCategory.objects.get(name=domain)
+                container.domain = dom_cat
+                container.domain_category = dom_cat.name
+            except DomainCategory.DoesNotExist:
+                dom_cat = DomainCategory.objects.filter(name=domain).first()
+                if dom_cat:
+                    container.domain = dom_cat
+                    container.domain_category = dom_cat.name
+                    
+        if para:
+            container.para_category = para
+            
+        container.priority = request.POST.get('priority', 'Medium')
+        container.urgency = request.POST.get('urgency', 'Normal')
+        
+        try:
+            container.save()
+        except ValidationError as e:
+            messages.error(request, f"Error: {e.messages[0]}")
+            if request.headers.get('HX-Request'):
+                from django.urls import reverse
+                response = HttpResponse(status=200)
+                response['HX-Redirect'] = reverse('triage')
+                return response
+            return redirect('triage')
+        
+        if request.headers.get('HX-Request'):
+            return HttpResponse("")
         return redirect('triage')
     return redirect('triage')
 
@@ -495,15 +566,42 @@ def settings_view(request):
             settings.slm_provider = slm_prov
         settings.slm_endpoint = request.POST.get('slm_endpoint', settings.slm_endpoint)
         settings.slm_api_key = request.POST.get('slm_api_key', settings.slm_api_key)
+        
+        # V5 Settings
+        db_url = request.POST.get('database_url')
+        if db_url is not None:
+            import dotenv
+            from django.conf import settings as django_settings
+            env_path = django_settings.BASE_DIR / '.env'
+            # Only save if it actually changed
+            current_env = dotenv.dotenv_values(env_path)
+            if current_env.get('DATABASE_URL') != db_url:
+                dotenv.set_key(str(env_path), 'DATABASE_URL', db_url)
+                messages.warning(request, "Database URL changed! You MUST manually restart the Django server for this to take effect.")
 
         settings.save()
         messages.success(request, "Settings updated successfully!")
         return redirect('settings')
         
+    try:
+        import zoneinfo
+        available_timezones = sorted(zoneinfo.available_timezones())
+    except ImportError:
+        import pytz
+        available_timezones = pytz.all_timezones
+        
+    import dotenv
+    from django.conf import settings as django_settings
+    env_path = django_settings.BASE_DIR / '.env'
+    env_vars = dotenv.dotenv_values(env_path)
+    current_db_url = env_vars.get('DATABASE_URL', '')
+
     domains = DomainCategory.objects.all().order_by('name')
     calendars = GoogleCalendar.objects.all().order_by('name')
     context = {
         'settings': settings,
+        'timezones': available_timezones,
+        'current_db_url': current_db_url,
         'domains': domains,
         'calendars': calendars,
     }
@@ -591,20 +689,48 @@ def explorer_view(request):
     root_containers = WorkspaceContainer.objects.filter(
         parent=None,
         is_archived=False
-    ).order_by('container_type', 'title')
+    )
     
     orphan_items = ExecutionItem.objects.filter(
         content_type=None,
         is_deleted=False,
         is_archived=False
-    ).order_by('status', '-created_at')
+    )
+    
+    tag_ids_param = request.GET.get('tags')
+    exclude_tag_ids_param = request.GET.get('exclude_tags')
+    untagged_param = request.GET.get('untagged')
+    
+    if tag_ids_param:
+        tag_ids = [int(tid) for tid in tag_ids_param.split(',') if tid.strip().isdigit()]
+        for tid in tag_ids:
+            root_containers = root_containers.filter(tags__id=tid)
+            orphan_items = orphan_items.filter(tags__id=tid)
+            
+    if exclude_tag_ids_param:
+        exclude_tag_ids = [int(tid) for tid in exclude_tag_ids_param.split(',') if tid.strip().isdigit()]
+        if exclude_tag_ids:
+            root_containers = root_containers.exclude(tags__id__in=exclude_tag_ids)
+            orphan_items = orphan_items.exclude(tags__id__in=exclude_tag_ids)
+            
+    if untagged_param == 'true':
+        root_containers = root_containers.filter(tags__isnull=True)
+        orphan_items = orphan_items.filter(tags__isnull=True)
+        
+    root_containers = root_containers.order_by('container_type', 'title').distinct()
+    orphan_items = orphan_items.order_by('status', '-created_at').distinct()
     
     all_containers = WorkspaceContainer.objects.filter(is_archived=False).order_by('title')
+    all_tags = Tag.objects.all().order_by('name')
     
     context = {
         'root_containers': root_containers,
         'orphan_items': orphan_items,
         'all_containers': all_containers,
+        'all_tags': all_tags,
+        'current_tags': tag_ids_param,
+        'current_exclude': exclude_tag_ids_param,
+        'current_untagged': untagged_param,
     }
     return render(request, 'explorer.html', context)
 
@@ -613,13 +739,31 @@ def explorer_children_view(request):
     parent_type = request.GET.get('parent_type')
     parent_id = request.GET.get('parent_id')
     
+    tag_ids_param = request.GET.get('tags')
+    exclude_tag_ids_param = request.GET.get('exclude_tags')
+    untagged_param = request.GET.get('untagged')
+    
+    def apply_tag_filters(qs):
+        if tag_ids_param:
+            tag_ids = [int(tid) for tid in tag_ids_param.split(',') if tid.strip().isdigit()]
+            for tid in tag_ids:
+                qs = qs.filter(tags__id=tid)
+        if exclude_tag_ids_param:
+            exclude_tag_ids = [int(tid) for tid in exclude_tag_ids_param.split(',') if tid.strip().isdigit()]
+            if exclude_tag_ids:
+                qs = qs.exclude(tags__id__in=exclude_tag_ids)
+        if untagged_param == 'true':
+            qs = qs.filter(tags__isnull=True)
+        return qs.distinct()
+
     if parent_type == 'container':
         parent_container = get_object_or_404(WorkspaceContainer, id=parent_id)
         
         child_containers = WorkspaceContainer.objects.filter(
             parent=parent_container,
             is_archived=False
-        ).order_by('order', 'title')
+        )
+        child_containers = apply_tag_filters(child_containers).order_by('order', 'title')
         
         container_ct = ContentType.objects.get_for_model(WorkspaceContainer)
         child_items = ExecutionItem.objects.filter(
@@ -627,7 +771,8 @@ def explorer_children_view(request):
             object_id=parent_container.id,
             is_deleted=False,
             is_archived=False
-        ).order_by('status', 'created_at')
+        )
+        child_items = apply_tag_filters(child_items).order_by('status', 'created_at')
         
         all_containers = WorkspaceContainer.objects.filter(is_archived=False).exclude(id=parent_container.id).order_by('title')
         
@@ -647,7 +792,8 @@ def explorer_children_view(request):
             object_id=parent_task.id,
             is_deleted=False,
             is_archived=False
-        ).order_by('status', 'created_at')
+        )
+        child_items = apply_tag_filters(child_items).order_by('status', 'created_at')
         
         all_containers = WorkspaceContainer.objects.filter(is_archived=False).order_by('title')
         
@@ -719,10 +865,16 @@ def explorer_move_view(request):
                     messages.error(request, "Cannot set container as parent of itself.")
                 else:
                     container.parent = new_parent
-                    container.save()
+                    try:
+                        container.save()
+                    except ValidationError as e:
+                        messages.error(request, f"Error: {e.messages[0]}")
             else:
                 container.parent = None
-                container.save()
+                try:
+                    container.save()
+                except ValidationError as e:
+                    messages.error(request, f"Error: {e.messages[0]}")
             
         elif node_type == 'item':
             item = get_object_or_404(ExecutionItem, id=node_id)
@@ -772,12 +924,39 @@ def explorer_edit_view(request, node_type, node_id):
                 container.domain_category = ''
                 
             container.para_category = request.POST.get('para_category', container.para_category)
-            container.save()
+            
+            container.priority = request.POST.get('priority', container.priority)
+            container.urgency = request.POST.get('urgency', container.urgency)
+            
+            # Reparenting
+            parent_id_str = request.POST.get('parent_id')
+            if parent_id_str == 'none':
+                container.parent = None
+            elif parent_id_str and parent_id_str.isdigit():
+                new_parent = WorkspaceContainer.objects.filter(id=int(parent_id_str)).first()
+                if new_parent and new_parent.id != container.id:
+                    container.parent = new_parent
+                    
+            try:
+                container.save()
+            except ValidationError as e:
+                messages.error(request, f"Error: {e.messages[0]}")
+                return redirect('explorer-edit', node_type='container', node_id=container.id)
+            
+            # Tags
+            tag_ids = request.POST.getlist('tags')
+            if tag_ids:
+                container.tags.set(Tag.objects.filter(id__in=tag_ids))
+            else:
+                container.tags.clear()
+                
             return redirect('explorer')
             
         domains = DomainCategory.objects.all().order_by('name')
         paras = [choice[0] for choice in ExecutionItem.PARA_CATEGORIES]
         types = ['Epic', 'Project', 'Specialization', 'Course', 'Module']
+        all_containers = WorkspaceContainer.objects.exclude(id=container.id).order_by('title')
+        all_tags = Tag.objects.all().order_by('name')
         
         return render(request, 'explorer_edit.html', {
             'container': container,
@@ -785,6 +964,8 @@ def explorer_edit_view(request, node_type, node_id):
             'domains': domains,
             'paras': paras,
             'types': types,
+            'all_containers': all_containers,
+            'all_tags': all_tags,
         })
         
     elif node_type == 'item':
@@ -793,7 +974,12 @@ def explorer_edit_view(request, node_type, node_id):
             item.title = request.POST.get('title', item.title)
             item.item_type = request.POST.get('item_type', item.item_type)
             item.status = request.POST.get('status', item.status)
+            if item.status == 'Completed':
+                item.is_completed = True
+            else:
+                item.is_completed = False
             item.priority = request.POST.get('priority', item.priority)
+            item.urgency = request.POST.get('urgency', item.urgency)
             
             dom_name = request.POST.get('domain_category')
             if dom_name:
@@ -860,13 +1046,22 @@ def explorer_edit_view(request, node_type, node_id):
             else:
                 NotionIntegration.objects.filter(execution_item=item).delete()
                 
+            # 7. Tags
+            tag_ids = request.POST.getlist('tags')
+            if tag_ids:
+                item.tags.set(Tag.objects.filter(id__in=tag_ids))
+            else:
+                item.tags.clear()
+                
             return redirect('explorer')
             
         domains = DomainCategory.objects.all().order_by('name')
         paras = [choice[0] for choice in ExecutionItem.PARA_CATEGORIES]
         statuses = [choice[0] for choice in ExecutionItem.STATUS_CHOICES]
         priorities = [choice[0] for choice in ExecutionItem.PRIORITY_CHOICES]
+        urgencies = [choice[0] for choice in ExecutionItem.URGENCY_CHOICES]
         types = [choice[0] for choice in ExecutionItem.ITEM_TYPES]
+        all_tags = Tag.objects.all().order_by('name')
         
         # Get related configs
         recurrence = RecurringConfig.objects.filter(execution_item=item).first()
@@ -879,9 +1074,11 @@ def explorer_edit_view(request, node_type, node_id):
             'paras': paras,
             'statuses': statuses,
             'priorities': priorities,
+            'urgencies': urgencies,
             'types': types,
             'recurrence': recurrence,
             'notion': notion,
+            'all_tags': all_tags,
             'fuzzy_timeframes': ['Today', 'Tomorrow', 'Weekend', 'Week', 'Month'],
             'frequencies': ['Daily', 'Weekly', 'Monthly', 'Quarterly', 'Annually', 'Custom'],
         })
@@ -1075,8 +1272,10 @@ def planner_parse_nl_view(request):
             
             # 2. Extract into ExecutionItem
             from .models import ExecutionItem
-            # Provide raw text as title for MVP
-            title = nl_text
+            
+            title = constraints.get('title')
+            if not title:
+                title = nl_text
             if len(title) > 255: title = title[:252] + '...'
             
             new_item = ExecutionItem.objects.create(

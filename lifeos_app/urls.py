@@ -1,4 +1,4 @@
-# ==============================================================================
+ # ==============================================================================
 # File: f:/Code Repo/LifeOS_Django/lifeos_app/urls.py
 # Description: Application level URL routing configurations for Django endpoints
 # Component: Core / URL Configuration
@@ -20,6 +20,7 @@ urlpatterns = [
     path('clear-toast/', views.clear_toast_view, name='clear-toast'),
     path('triage/', views.triage_view, name='triage'),
     path('triage/<int:item_id>/process/', views.process_triage_view, name='process-triage'),
+    path('triage/container/<int:container_id>/process/', views.process_container_triage_view, name='process-container-triage'),
     
     # V4.0 Planner Routes
     path('planner/', views.planner_view, name='planner'),

@@ -79,6 +79,14 @@ class AppSettings(models.Model):
         return "System AppSettings"
 
 
+class Tag(models.Model):
+    name = models.CharField(max_length=100, unique=True)
+    color = models.CharField(max_length=7, default="#9966CC", help_text="Hex color code")
+    
+    def __str__(self):
+        return self.name
+
+
 class WorkspaceContainer(models.Model):
     """
     Unified type-discriminated container supporting hierarchical structures:
@@ -130,6 +138,25 @@ class WorkspaceContainer(models.Model):
     
     # Archival state (FR-LIFE-001)
     is_archived = models.BooleanField(default=False, db_index=True)
+    
+    PRIORITY_CHOICES = [
+        ('Low', 'Low'),
+        ('Medium', 'Medium'),
+        ('High', 'High'),
+        ('Critical', 'Critical'),
+    ]
+
+    URGENCY_CHOICES = [
+        ('Low', 'Low'),
+        ('Normal', 'Normal'),
+        ('High', 'High'),
+        ('Immediate', 'Immediate'),
+    ]
+
+    # V5 Extensions
+    tags = models.ManyToManyField(Tag, blank=True, related_name='containers')
+    priority = models.CharField(max_length=50, choices=PRIORITY_CHOICES, default='Medium', db_index=True)
+    urgency = models.CharField(max_length=50, choices=URGENCY_CHOICES, default='Normal', db_index=True)
 
     def clean(self):
         # Prevent self-referencing hierarchy cycles (FR-DATA-001.3)
@@ -248,6 +275,9 @@ class ExecutionItem(models.Model):
     priority = models.CharField(max_length=50, choices=PRIORITY_CHOICES, default='Medium', db_index=True)
     urgency = models.CharField(max_length=50, choices=URGENCY_CHOICES, default='Normal', db_index=True)
     is_pinned = models.BooleanField(default=False, db_index=True)
+    
+    # V5 Extensions
+    tags = models.ManyToManyField(Tag, blank=True, related_name='execution_items')
 
     # V3.0 Timeframes & Calendaring Dates
     start_date = models.DateTimeField(null=True, blank=True)

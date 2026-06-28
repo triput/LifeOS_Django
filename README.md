@@ -3,35 +3,38 @@
 # File: README.md
 # Description: Primary documentation and bootstrap instructions for the LifeOS Django repository
 # Component: Documentation
-# Version: 1.0 (Gold Master)
+# Version: 5.0 (Gold Master)
 # Created: 2026-06-26
-# Last Update: 2026-06-26
+# Last Update: 2026-06-27
 # ==============================================================================
 -->
-# LifeOS Django
+# LifeOS Django (V5.0)
 
 LifeOS Django is a stability-first, single-owner personal operating system designed to run locally. Built around a unified DRY data model, it consolidates work management (Epics, Projects, Tasks) and academic learning trackers (Specializations, Courses, Modules, LearningTasks) into a cohesive relational structure. 
 
-The application utilizes server-rendered Django templates, HTMX for partial-page reactivity, and is backed by PostgreSQL (development/production) and SQLite (testing).
+The application utilizes server-rendered Django templates, HTMX for partial-page reactivity, and is backed by PostgreSQL or local SQLite databases (user-configurable).
 
 ---
 
 ## Key Features
 
-*   **Unified DRY Data Model**: Avoids separate databases/model trees for work and study by implementing type-discriminated `WorkspaceContainer` and actionable `ExecutionItem` records.
-*   **Consolidated Focus Engine**: Universal timing controls allowing active focus tracking over tasks. Enforces a single-active-timer constraint to prevent tracking overlap.
-*   **Unified Domain Context HUD**: Real-time dashboard panel displaying:
-    *   *Atmospheric Telemetry*: Temperature, sunrise, and sunset times via Open-Meteo.
-    *   *Space Weather Telemetry*: Geomagnetic Kp Index levels via NOAA SWPC.
-    *   *Progress Aggregates*: Allocation statistics and completion velocities grouped by Domain and PARA classifications.
+*   **Unified DRY Data Model**: Combines work and study hierarchies into a type-discriminated `WorkspaceContainer` and actionable leaf-node `ExecutionItem` records.
+*   **Consolidated Focus Engine**: Universal timing controls to track focus. Supports manual time overrides (`extra_actual_seconds`) and recursive, chronological container timing roll-ups.
+*   **Fuzzy Scheduling Engine & Time Block Optimizer**: A hybrid scheduling workflow combining:
+    *   *Natural Language Parsing*: A local Small Language Model (Ollama) parses unstructured constraints (dates, priorities, urgency) into structured JSON.
+    *   *Deterministic Interval Solver*: A greedy solver fits task items into free slots in your schedule, taking your defined Availability Windows and synced Google Calendar events (blocking/non-blocking) into account.
+*   **Backlog Explorer & Multi-Tag Filtering**: A collapsible tree explorer with parent reassignment, task status override options, and a checkbox filter supporting positive tag matching, tag exclusions, and untagged item filtering.
+*   **Inbox Triage Center**: Triages both orphaned tasks and newly created containers (e.g., Epics and Projects), defaulting items without dates into a Backlog status.
+*   **Dynamic Configurations**: Edit database backend URLs directly in the settings (updates `.env` with a server restart warning banner) and configure timezones using a searchable, auto-detecting IANA timezone selector.
 *   **Layered Security**: Enforces strong `Argon2` password hashing and a strict single-owner access policy via middleware that blocks and redirects unauthenticated or non-owner requests.
-*   **Isolated Testing Engine**: Built-in test suite automatically executes database checks inside local memory using SQLite, avoiding locking issues on cloud instances during test runs.
 
 ---
 
 ## Directory Index
 
-*   [USER_GUIDE.md](USER_GUIDE.md) - Operations guide detailing server startup, data structures, and focus sessions.
+*   [USER_GUIDE.md](USER_GUIDE.md) - Operations guide detailing server startup, layouts, and day-to-day use.
+*   [docs/LifeOS-SRS.md](docs/LifeOS-SRS.md) - Software Requirements Specification outlining system functional specs from versions 1.0 to 5.0.
+*   [docs/TECHNICAL_DOCS.md](docs/TECHNICAL_DOCS.md) - Technical Architecture guide outlining DB schemas, models, scheduling solver logic, and infrastructure.
 *   [validate_sandbox.py](validate_sandbox.py) - Environment verification script check.
 
 ---
@@ -80,5 +83,6 @@ Navigate to [http://127.0.0.1:8000/](http://127.0.0.1:8000/) in your browser.
 
 Validate system components, authentication middleware, and timing models:
 ```powershell
-python manage.py test lifeos_app
+python manage.py test
 ```
+*Runs the consolidated test suite including core models, focus widgets, calendar sync solvers, and triage cycle check validations.*

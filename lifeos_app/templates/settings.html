@@ -74,7 +74,11 @@
                 <!-- Timezone -->
                 <div>
                     <label class="block text-xs font-bold text-gray-400 uppercase tracking-wider mb-2">User Timezone</label>
-                    <input type="text" name="timezone" value="{{ settings.timezone }}" placeholder="e.g. America/Los_Angeles" class="w-full bg-[#0B0F19] text-gray-200 border border-gray-800 focus:ring-2 focus:ring-[#9966CC] focus:border-transparent rounded-lg p-3 text-sm">
+                    <select name="timezone" id="timezone-select" class="w-full bg-[#0B0F19] text-gray-200 border border-gray-800 focus:ring-2 focus:ring-[#9966CC] focus:border-transparent rounded-lg p-3 text-sm">
+                        {% for tz in timezones %}
+                        <option value="{{ tz }}" {% if tz == settings.timezone %}selected{% endif %}>{{ tz }}</option>
+                        {% endfor %}
+                    </select>
                 </div>
                 <!-- 24-Hour Time Toggle -->
                 <div class="flex items-center space-x-3 pt-6">
@@ -134,6 +138,18 @@
                 </div>
             </div>
 
+            <!-- V5.0 System Configuration -->
+            <div class="pt-4 border-t border-gray-800 space-y-4">
+                <h4 class="text-xs font-extrabold uppercase text-gray-400 tracking-wider">V5 System Configuration</h4>
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                    <div class="md:col-span-2">
+                        <label class="block text-[11px] text-gray-500 font-bold uppercase mb-1">Database URL (Connection String)</label>
+                        <input type="text" name="database_url" value="{{ current_db_url }}" class="w-full bg-[#0B0F19] text-gray-200 border border-gray-800 focus:ring-1 focus:ring-[#9966CC] focus:border-transparent rounded-lg p-2 text-xs" placeholder="e.g. postgresql://user:pass@host/db or sqlite:///path/to/db.sqlite3">
+                        <p class="text-[10px] text-gray-500 mt-1">Changes to this field require a manual server restart to take effect.</p>
+                    </div>
+                </div>
+            </div>
+
             <!-- AI Scheduling Switch -->
             <div class="flex items-center space-x-3 pt-6 border-t border-gray-800 mt-4">
                 <input type="checkbox" name="enable_ai_scheduling" id="enable_ai_scheduling" {% if settings.enable_ai_scheduling %}checked{% endif %} class="h-4 w-4 rounded text-[#9966CC] focus:ring-[#9966CC] bg-gray-950 border-gray-800">
@@ -148,6 +164,26 @@
             </div>
         </form>
     </div>
+    
+    <script>
+        document.addEventListener('DOMContentLoaded', function() {
+            var autoLoc = document.getElementById('auto_detect_location');
+            if (autoLoc && autoLoc.checked) {
+                var tzSelect = document.getElementById('timezone-select');
+                var localTz = Intl.DateTimeFormat().resolvedOptions().timeZone;
+                
+                // If it's currently default UTC, auto-select their browser timezone
+                if ("{{ settings.timezone }}" === "UTC" || "{{ settings.timezone }}" === "") {
+                    for (var i = 0; i < tzSelect.options.length; i++) {
+                        if (tzSelect.options[i].value === localTz) {
+                            tzSelect.selectedIndex = i;
+                            break;
+                        }
+                    }
+                }
+            }
+        });
+    </script>
 
     <!-- Dynamic Domain Categories Manager (FR-SET-007 / FR-SET-008) -->
     <div class="bg-[#0D111D] border border-gray-800/80 rounded-2xl p-8 shadow-xl space-y-6">

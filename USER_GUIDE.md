@@ -1,20 +1,21 @@
 <!--
 # ==============================================================================
 # File: USER_GUIDE.md
-# Description: User guide explaining application startup, authentication, structure, and focus features
+# Description: User guide explaining application startup, settings, layouts, and V5.0 features
 # Component: Documentation
-# Version: 3.0 (Gold Master)
+# Version: 5.0 (Gold Master)
 # Created: 2026-06-26
 # Last Update: 2026-06-27
 # ==============================================================================
 -->
-# LifeOS Django: User Guide (V3.0)
+# LifeOS Django: User Guide (V5.0)
 
-Welcome to **LifeOS Django V3.0**—a stability-first personal operating system built around a unified DRY data model. This guide outlines how to manage, navigate, and utilize the core modules of the system.
+Welcome to **LifeOS Django V5.0**—a stability-first personal operating system built around a unified DRY data model. This guide outlines how to start, navigate, configure, and utilize the application's core systems.
 
 ---
 
 ## 1. Starting the Application
+
 Since LifeOS Django is designed as a single-user local system, you run the service from your local workstation using the standard Django development server.
 
 ### Steps to Run
@@ -26,98 +27,90 @@ Since LifeOS Django is designed as a single-user local system, you run the servi
    ```powershell
    .venv\Scripts\activate
    ```
-3. Boot up the server:
+3. Run migrations to ensure your schema is up to date:
+   ```powershell
+   python manage.py migrate
+   ```
+4. Boot up the server:
    ```powershell
    python manage.py runserver
    ```
    *By default, the server will bind to port `8000` on localhost.*
-4. Open your web browser and navigate to:
+5. Open your web browser and navigate to:
    [http://127.0.0.1:8000/](http://127.0.0.1:8000/)
 
 ---
 
-## 2. Authentication & Security
-Access to the LifeOS Django interface is strictly limited to the system owner.
+## 2. Navigation Sidebar Layout
 
-### Logging In
-1. Navigate to the application URL (by default, `http://localhost:8000/login/` or `http://127.0.0.1:8000/login/`).
-2. Input the owner credentials you created during system setup (superuser account).
-3. If an unauthorized user attempts to access any page on the system, they will be blocked and redirected back to the login page.
+LifeOS V5.0 features a persistent, space-efficient side navigation bar structure:
+*   **The Top Command Bar**: Contains quick system actions (owner profile badge, quick brain dump entry field, and standard log out options).
+*   **The Left Vertical Sidebar**: Gives you instant access to view directories: Dashboard, Inbox Triage, Backlog Explorer, Planner, Analytics, and Academy.
+*   **Collapsible Design**: You can collapse the sidebar using the toggle chevron button in the bottom left corner. The collapsed state is persisted in your browser's `localStorage` so it remains unchanged between page loads.
 
 ---
 
 ## 3. Global Quick Entry ("Brain Dump")
-The header navigation bar features a persistent Quick Entry form to capture tasks or structural containers instantly without interrupting your current workflow.
 
-### Creating a Dump
-1. Go to the input field on the right side of the top navbar labeled **"Brain dump..."**.
-2. Type the title, and select the dump type from the dropdown:
-   *   **Task**: Placed as an unassigned task in the Inbox queue.
-   *   **Epic / Project / Specialization / Course / Module**: Instantly instantiates a Workspace Container of that type.
-3. Click the `+` button. The form submits via HTMX and flashes a success toast.
+Use the text field in the top bar to capture ideas immediately:
+1. Locate the input box labeled **"Brain dump..."** on the right side of the header.
+2. Enter the title of your task or container.
+3. Select its type:
+    *   **Task**: Sent to the Inbox queue as an unfiled execution item.
+    *   **Epic / Project / Specialization / Course / Module**: Instantiates a Workspace Container of that type.
+4. Press `Enter` or click the `+` button to submit.
 
 ---
 
 ## 4. Inbox Triage Center
-Unassigned tasks (brain dumps) sit in the **Inbox** stage. To classify and organize them, you use the Triage Center.
 
-### Triaging Tasks
-1. Navigate to **Inbox Triage** in the top navigation bar.
-2. For each card, fill in the following:
-    *   **Scope / Parent**: Nest the task under a Workspace Container (Epic, Project, Course, Module) OR select another Task to establish subtask relations.
-    *   **Domain & PARA Category**: Mark the life domain (dynamic Domain categories) and PARA class.
-    *   **Item Type & Priority**: Specify if it is a Task, LearningTask, or LifeActivity, and set its priority.
-    *   **Estimate**: Set a duration estimate (accepts human formats, e.g. `1h 30m` or `45`).
-    *   **Status Target**: Shift it into `Planned` or `Backlog`.
-3. Click **Process & File** to process.
+New ideas are placed into the Triage Center for organization. Unlike older versions, **LifeOS V5.0 supports triaging both Execution Items and Workspace Containers**.
 
----
-
-## 5. Backlog Explorer (Tree View) & Editing Scopes
-The **Backlog Explorer** provides a visual, collapsible tree hierarchy of your workspace.
-
-### Action Triggers in the Explorer
-*   **Add Child**: Type a title next to any container/task to nest a child task or subtask inline.
-*   **Move To**: Move a project or task to a new parent container.
-*   **Edit (Pencil)**: Opens the edit form to configure metadata:
-    *   **Human-readable time estimate** (e.g. `1.5h` or `45m`).
-    *   **Manual focus log**: Add time spent directly to the extra actual focus time bucket.
-    *   **Target dates**: Configure start, end, and due datetimes.
-    *   **Fuzzy calendar bucket**: Assign to `Today`, `Tomorrow`, `Weekend`, `Week`, `Month`.
-    *   **Recurrence schedules**: Configure frequency (Daily, Weekly, Monthly, Quarterly, Annually, Custom) for automatic cloning.
-    *   **Notion link**: Link a Notion document page.
+### Processing Items
+1. Navigate to **Inbox Triage** from the sidebar.
+2. For each card:
+    *   **Scope / Parent**: Nest the task under a parent Container, or link it to another Task to establish subtask connections. For new Containers, you can optionally define a parent Container.
+    *   **Domain & PARA Category**: Select the target life domain and PARA category.
+    *   **Status Target**: Direct it to `Planned` or `Backlog`.
+    *   **Default Status Rule**: If you do not assign a start or due date, the item will intelligently default to **Backlog** status when processed to prevent clutter.
+3. Click **Process & File** (or **Process Container**) to complete triaging.
 
 ---
 
-## 6. Consolidated Focus Engine & Scheduled Agendas
-The Focus Engine handles real-time timer tracking for all execution tasks.
+## 5. Backlog Explorer (Tree View)
 
-### Today's Focus Agenda
-*   Pin tasks using the **Pin (thumbtack)** icon on any task card.
-*   They display at the top of the Dashboard. Pinned tasks allow you to quickly run focus sessions without distractions.
+The **Backlog Explorer** provides a collapsible tree showing all of your active folders, projects, tasks, and subtasks.
 
-### Scheduled & Upcoming Agenda
-*   Displays tasks scheduled with explicit start/due dates or fuzzy timeframe buckets (`Today`, `Tomorrow`, `Weekend`, etc.).
-*   Keep track of future tasks and quickly toggle pins directly from the calendar feed.
-
----
-
-## 7. Academy Hub & Certifications HUD
-A dedicated view (`/academy/`) to manage academic curriculum and track certifications.
-
-### Core Features
-*   **Certifications HUD**: Record professional achievements (e.g. PMP, CSM) with achieved/renewal dates and interactive PDU progress bars.
-*   **Curriculum Scope**: View coursework folders (Specializations, Courses, Modules) and total accumulated time spent.
-*   **Coursework Assignments**: Dedicated dashboard cards showing all active `LearningTask` elements.
+### Advanced Features in V5.0:
+*   **Multi-Tag Filtering**: Use the tag filter checkboxes at the top of the explorer to narrow down items:
+    *   Filter by single or multiple tags (only items matching all selected tags are shown).
+    *   Exclude tags (hide items matching selected tags).
+    *   Filter for untagged items.
+*   **Parent Reassignment**: Open the edit modal (pencil icon) on any Container or Execution Item. You can now re-assign the parent container relationship to restructure your hierarchy.
+*   **Status Override**: If you accidentally complete an item, opening its edit form allows you to change the status back to an active state (like *In Progress* or *Planned*), which automatically resets the completion flag in the database.
+*   **Dates Display**: Start, end, and due dates, along with active tags and urgency levels, are displayed directly on the explorer cards.
 
 ---
 
-## 8. User Settings & Integrations
-Manage configuration parameters directly in the settings view `/settings/`.
+## 6. Planner, Availability Blocks, and SLM Scheduling
 
-### Configuration Options
-*   **User Preferences**: Focus duration, work day start hour, metric/imperial toggle, timezone dropdown, and 12h/24h time formats.
-*   **Browser Geolocation**: Enable auto-detection or input manual latitude and longitude.
-*   **Dashboard HUD Renaming**: Custom title labels for dashboard HUD metrics.
-*   **Dynamic Domain Manager**: Add and delete custom domain categories with distinct colors, icons, and academic flags.
-*   **Google Calendar**: Integrate multiple Google Calendar feeds to import external events.
+The Planner (`/planner/`) houses your automated calendar and scheduling engines.
+
+### Dynamic Availability Blocks & Hard Busy Blocks
+*   Configure **Availability Windows** (e.g. "Work Hours", "Weekend Hobby") in Settings.
+*   Integrate **Google Calendar** feeds to load busy times. You can toggle calendar items between **blocking** (tasks cannot overlap) or **non-blocking** (tasks can overlap).
+
+### Automated SLM Scheduler
+1. Enter scheduling constraints in plain language in the natural language planning input.
+2. Click **Optimize Timeline**. The local Small Language Model (Ollama) will parse your request into temporal bounds, and the deterministic solver will generate task schedules around your availability blocks and calendar events.
+
+---
+
+## 7. Configuration Settings
+
+The Settings panel (`/settings/`) allows you to tune system parameters:
+*   **Database Custom Path**: Input a local SQLite path or PostgreSQL connection URL.
+    > [!WARNING]
+    > Changing the database URL string rewrites the local `.env` environment file. A warning banner will display on screen; you must restart the Django server application to load the new database connections.
+*   **IANA Timezones**: A searchable dropdown list for setting timezones, with auto-detection.
+*   **Domain Manager**: Create, rename, or delete life domains, toggle their custom colors/icons, or mark them as "Academy" domains to aggregate learning metrics separately.

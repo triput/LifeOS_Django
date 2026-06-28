@@ -28,16 +28,29 @@ def parse_natural_language_constraints(text: str) -> dict:
         raise SLMParseError("SLM parsing is currently disabled (Provider set to 'Skip' in Settings).")
         
     from django.utils import timezone
-    current_date = timezone.now().date().isoformat()
-    current_day = timezone.now().strftime("%A")
+    import datetime
+    
+    now = timezone.now()
+    current_date = now.date().isoformat()
+    current_day = now.strftime("%A")
+    
+    # Generate a 7-day lookup dictionary to assist the SLM in calendar mapping
+    days_context = []
+    for i in range(7):
+        d = now + datetime.timedelta(days=i)
+        days_context.append(f"{d.strftime('%A')}: {d.date().isoformat()}")
+    days_context_str = ", ".join(days_context)
     
     system_prompt = f"""
     You are an intelligent scheduling assistant. Extract scheduling constraints from the user's input.
-    The current date is {current_date} ({current_day}). Use this context to resolve relative dates like "tomorrow".
+    The current date is {current_date} ({current_day}).
+    Upcoming days reference: {days_context_str}.
+    Use this lookup table context to map day names (like "Tuesday") directly to their absolute YYYY-MM-DD dates.
     Return ONLY a valid JSON object matching this exact schema without any markdown blocks or conversational text.
     
     Schema:
     {{
+      "title": "Clean, concise name of the task (e.g. 'Hair with Holly'), stripping out verbs like 'schedule' or details like dates, times, and priorities",
       "duration_minutes": integer or null (estimate time if not provided, default 30),
       "priority": "Low" | "Medium" | "High" | "Critical" or null,
       "urgency": "Low" | "Normal" | "High" | "Immediate" or null,

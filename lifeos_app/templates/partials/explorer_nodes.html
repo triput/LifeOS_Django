@@ -10,7 +10,7 @@
                 <input type="checkbox" name="selected_containers" value="{{ child.id }}" class="rounded text-[#9966CC] focus:ring-[#9966CC] bg-gray-950 border-gray-800">
                 <!-- Toggle Expand -->
                 <button type="button" 
-                        hx-get="{% url 'explorer-children' %}?parent_type=container&parent_id={{ child.id }}"
+                        hx-get="{% url 'explorer-children' %}?parent_type=container&parent_id={{ child.id }}&tags={{ current_tags|default:'' }}&exclude_tags={{ current_exclude|default:'' }}&untagged={{ current_untagged|default:'' }}"
                         hx-target="#node-children-content-container-{{ child.id }}"
                         hx-swap="innerHTML"
                         class="text-gray-400 hover:text-white transition-colors"
@@ -22,6 +22,17 @@
                 </button>
                 <span class="text-sm font-bold text-gray-200">{{ child.title }}</span>
                 <span class="text-[9px] uppercase font-extrabold tracking-wider px-1.5 py-0.5 rounded bg-gray-800/60 border border-gray-700/50 text-[#0F52BA]">{{ child.container_type }}</span>
+                {% if child.priority != 'Medium' %}<span class="text-[9px] uppercase font-bold text-[#E0115F] px-1 border border-[#E0115F]/30 bg-[#E0115F]/10 rounded ml-1">P: {{ child.priority }}</span>{% endif %}
+                {% if child.urgency != 'Normal' %}<span class="text-[9px] uppercase font-bold text-[#FFBF00] px-1 border border-[#FFBF00]/30 bg-[#FFBF00]/10 rounded ml-1">U: {{ child.urgency }}</span>{% endif %}
+                
+                <!-- Tags display -->
+                {% if child.tags.all %}
+                    <div class="flex space-x-1 ml-2">
+                        {% for t in child.tags.all %}
+                        <span class="w-2.5 h-2.5 rounded-full" style="background-color: {{ t.color }};" title="{{ t.name }}"></span>
+                        {% endfor %}
+                    </div>
+                {% endif %}
             </div>
 
             <!-- Quick Action controls -->
@@ -82,9 +93,8 @@
             <div class="flex items-center space-x-2.5">
                 <input type="checkbox" name="selected_items" value="{{ item.id }}" class="rounded text-[#9966CC] focus:ring-[#9966CC] bg-gray-950 border-gray-800">
                 
-                <!-- Expand Subtasks -->
                 <button type="button" 
-                        hx-get="{% url 'explorer-children' %}?parent_type=task&parent_id={{ item.id }}"
+                        hx-get="{% url 'explorer-children' %}?parent_type=task&parent_id={{ item.id }}&tags={{ current_tags|default:'' }}&exclude_tags={{ current_exclude|default:'' }}&untagged={{ current_untagged|default:'' }}"
                         hx-target="#node-children-content-task-{{ item.id }}"
                         hx-swap="innerHTML"
                         class="text-gray-400 hover:text-white transition-colors"
@@ -95,6 +105,18 @@
                 </button>
                 <span class="text-sm {% if item.is_completed %}line-through text-gray-500{% else %}text-gray-300{% endif %}">{{ item.title }}</span>
                 <span class="text-[9px] font-semibold text-gray-500">{{ item.item_type }}</span>
+                {% if item.start_date %}<span class="text-[9px] text-gray-500 font-medium ml-2">Start: {{ item.start_date|date:"m/d" }}</span>{% endif %}
+                {% if item.due_date %}<span class="text-[9px] text-[#E0115F]/80 font-bold ml-1">Due: {{ item.due_date|date:"m/d" }}</span>{% endif %}
+                {% if item.urgency != 'Normal' %}<span class="text-[9px] uppercase font-bold text-[#FFBF00] px-1 border border-[#FFBF00]/30 bg-[#FFBF00]/10 rounded ml-1">U: {{ item.urgency }}</span>{% endif %}
+                
+                <!-- Tags display -->
+                {% if item.tags.all %}
+                    <div class="flex space-x-1 ml-2">
+                        {% for t in item.tags.all %}
+                        <span class="w-2.5 h-2.5 rounded-full" style="background-color: {{ t.color }};" title="{{ t.name }}"></span>
+                        {% endfor %}
+                    </div>
+                {% endif %}
             </div>
 
             <div class="flex items-center space-x-3 text-xs">

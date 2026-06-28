@@ -22,7 +22,7 @@ from django.utils import timezone
 import datetime
 import os
 
-from .models import WorkspaceContainer, ExecutionItem, AppSettings
+from .models import WorkspaceContainer, ExecutionItem, AppSettings, Tag, DomainCategory
 
 User = get_user_model()
 
@@ -644,3 +644,217 @@ class LifeOSV3FeaturesTestCase(TestCase):
             kwargs = mock_get.call_args[1]
             params = kwargs.get('params', {})
             self.assertEqual(params.get('timezone'), 'auto') # PDT sanitized to auto!
+
+
+from unittest.mock import patch, MagicMock
+from .scheduler import calculate_rank_score, generate_schedule_for_date
+from .slm_parser import parse_natural_language_constraints, SLMParseError
+
+class V4SchedulerTests(TestCase):
+    def setUp(self):
+        self.settings = AppSettings.get_solo()
+        self.settings.enable_ai_scheduling = True
+        self.settings.priority_weight = 1.5
+        self.settings.urgency_weight = 2.0
+        self.settings.save()
+        
+        self.item_critical_immediate = ExecutionItem.objects.create(
+            title="Critical Immediate", item_type="Task", status="Planned",
+            priority="Critical", urgency="Immediate", duration_estimate=30
+        )
+        self.item_low_low = ExecutionItem.objects.create(
+            title="Low Low", item_type="Task", status="Planned",
+            priority="Low", urgency="Low", duration_estimate=60
+        )
+        
+    def test_calculate_rank_score(self):
+        # Critical(4) * 1.5 + Immediate(4) * 2.0 - (30 * 0.05) = 6.0 + 8.0 - 1.5 = 12.5
+        score_high = calculate_rank_score(self.item_critical_immediate, self.settings)
+        self.assertEqual(score_high, 12.5)
+        
+        # Low(1) * 1.5 + Low(1) * 2.0 - (60 * 0.05) = 1.5 + 2.0 - 3.0 = 0.5
+        score_low = calculate_rank_score(self.item_low_low, self.settings)
+        self.assertEqual(score_low, 0.5)
+
+    def test_generate_schedule_fallback_block(self):
+        target_date = timezone.now().date() + datetime.timedelta(days=1)
+        generate_schedule_for_date(target_date)
+        
+        # Verify allocations were created
+        self.item_critical_immediate.refresh_from_db()
+        self.item_low_low.refresh_from_db()
+        
+        self.assertTrue(hasattr(self.item_critical_immediate, 'scheduled_allocation'))
+        self.assertTrue(hasattr(self.item_low_low, 'scheduled_allocation'))
+        
+        # Critical immediate should be scheduled FIRST
+        alloc1 = self.item_critical_immediate.scheduled_allocation
+        alloc2 = self.item_low_low.scheduled_allocation
+        
+        self.assertTrue(alloc1.start_time <= alloc2.start_time)
+
+
+class V4SLMParserTests(TestCase):
+    def setUp(self):
+        self.settings = AppSettings.get_solo()
+        
+    @patch('lifeos_app.slm_parser.requests.post')
+    def test_slm_parser_success(self, mock_post):
+        self.settings.slm_provider = 'Local Ollama'
+        self.settings.save()
+        
+        mock_response = MagicMock()
+        mock_response.json.return_value = {
+            'response': '{"title": "Do something", "duration_minutes": 60, "priority": "High", "urgency": "Normal"}'
+        }
+        mock_post.return_value = mock_response
+        
+        result = parse_natural_language_constraints("Do something high priority")
+        self.assertEqual(result.get('duration_minutes'), 60)
+        self.assertEqual(result.get('priority'), 'High')
+
+    def test_slm_parser_skipped(self):
+        self.settings.slm_provider = 'Skip'
+        self.settings.save()
+        
+        with self.assertRaises(SLMParseError):
+            parse_natural_language_constraints("Do something")
+
+
+class V5FeatureTests(TestCase):
+    def setUp(self):
+        self.owner = User.objects.create_superuser(
+            username='owner_trish',
+            password='StrongSecurePassword123!',
+            email='trish@lifeos.lan'
+        )
+        self.client = Client()
+        self.client.login(username='owner_trish', password='StrongSecurePassword123!')
+        
+        self.domain = DomainCategory.objects.create(name="Engineering")
+        
+        # Create some tags
+        self.tag_urgent = Tag.objects.create(name="Urgent", color="#FF0000")
+        self.tag_feature = Tag.objects.create(name="Feature", color="#00FF00")
+        self.tag_bug = Tag.objects.create(name="Bug", color="#0000FF")
+        
+        # Create a container
+        self.container = WorkspaceContainer.objects.create(
+            title="V5 Engine Upgrade",
+            container_type="Project",
+            domain=self.domain,
+            domain_category="Engineering",
+            priority="High",
+            urgency="Immediate"
+        )
+        self.container.tags.add(self.tag_urgent, self.tag_feature)
+        
+        # Create an orphaned container
+        self.orphan_container = WorkspaceContainer.objects.create(
+            title="Quick Dump Container",
+            container_type="Project",
+            priority="Medium",
+            urgency="Normal"
+        )
+        
+        # Create an execution item in inbox
+        self.inbox_item = ExecutionItem.objects.create(
+            title="Fix login bug",
+            item_type="Task",
+            status="Inbox",
+            priority="Critical",
+            urgency="High"
+        )
+        self.inbox_item.tags.add(self.tag_bug)
+        
+        # Create a planned execution item
+        self.planned_item = ExecutionItem.objects.create(
+            title="Implement Tagging",
+            item_type="Task",
+            status="Planned",
+            priority="Medium",
+            urgency="Normal",
+            content_type=ContentType.objects.get_for_model(WorkspaceContainer),
+            object_id=self.container.id
+        )
+        self.planned_item.tags.add(self.tag_feature)
+
+    def test_container_priority_and_urgency(self):
+        """Test that Priority and Urgency are properly saved and retrieved on WorkspaceContainers"""
+        self.assertEqual(self.container.priority, "High")
+        self.assertEqual(self.container.urgency, "Immediate")
+        
+    def test_item_priority_and_urgency(self):
+        """Test that Priority and Urgency are properly saved and retrieved on ExecutionItems"""
+        self.assertEqual(self.inbox_item.priority, "Critical")
+        self.assertEqual(self.inbox_item.urgency, "High")
+
+    def test_tagging_system_relations(self):
+        """Test that the ManyToMany tag relations are functioning"""
+        self.assertIn(self.tag_urgent, self.container.tags.all())
+        self.assertIn(self.tag_bug, self.inbox_item.tags.all())
+        self.assertEqual(self.container.tags.count(), 2)
+
+    def test_backlog_explorer_filtering(self):
+        """Test the ?tags= query filtering logic on the explorer endpoint"""
+        # Test filtering by a tag that belongs to the container
+        response = self.client.get(reverse('explorer') + f"?tags={self.tag_urgent.id}")
+        self.assertEqual(response.status_code, 200)
+        self.assertIn(self.container, response.context['root_containers'])
+        
+        # Test filtering by a tag that DOES NOT belong to the container
+        response = self.client.get(reverse('explorer') + f"?tags={self.tag_bug.id}")
+        self.assertEqual(response.status_code, 200)
+        self.assertNotIn(self.container, response.context['root_containers'])
+
+    def test_triage_view_orphan_containers(self):
+        """Test that orphaned containers (no domain, no parent) appear in Triage"""
+        response = self.client.get(reverse('triage'))
+        self.assertEqual(response.status_code, 200)
+        self.assertIn(self.orphan_container, response.context['orphan_containers'])
+        self.assertNotIn(self.container, response.context['orphan_containers'])
+
+    def test_process_triage_default_to_backlog(self):
+        """Test processing an Inbox item without dates correctly sets status to Backlog"""
+        post_data = {
+            'container': f'container_{self.container.id}',
+            'domain': self.domain.name,
+            'para': 'Projects',
+            'item_type': 'Task',
+            'priority': 'High',
+            'status': ''
+        }
+        
+        response = self.client.post(reverse('process-triage', args=[self.inbox_item.id]), post_data)
+        
+        self.inbox_item.refresh_from_db()
+        
+        self.assertEqual(self.inbox_item.status, 'Backlog')
+        self.assertEqual(self.inbox_item.content_type.model, 'workspacecontainer')
+        self.assertEqual(self.inbox_item.object_id, self.container.id)
+
+    def test_triage_container_circular_dependency_graceful_error(self):
+        """Test that triaging a container with circular dependency does not crash with 500, but redirects gracefully with message"""
+        # Create a child container
+        child_container = WorkspaceContainer.objects.create(
+            title="Child",
+            container_type="Project",
+            parent=self.orphan_container
+        )
+        
+        # Now try to triage the orphan container and assign its parent to child_container (creates circular dependency: orphan -> child -> orphan)
+        post_data = {
+            'container': f'container_{child_container.id}',
+            'domain': self.domain.name,
+            'para': 'Projects'
+        }
+        
+        response = self.client.post(reverse('process-container-triage', args=[self.orphan_container.id]), post_data)
+        
+        # Check that it redirected back to triage
+        self.assertEqual(response.status_code, 302)
+        self.assertTrue(response.url.endswith(reverse('triage')))
+        
+        # Verify database is intact (orphan_container parent is still None)
+        self.orphan_container.refresh_from_db()
+        self.assertIsNone(self.orphan_container.parent)
