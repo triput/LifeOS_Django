@@ -211,9 +211,12 @@
                     </div>
                 </div>
                 <!-- Delete Domain link -->
-                <a href="{% url 'domain-delete' d.id %}" onclick="return confirm('Delete domain category {{ d.name }}?');" class="text-gray-500 hover:text-[#E0115F] transition-colors p-1.5 rounded-lg hover:bg-gray-800/40">
-                    <svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/></svg>
-                </a>
+                <form method="POST" action="{% url 'domain-delete' d.id %}" class="inline" onsubmit="return confirm('Delete domain category {{ d.name }}?');">
+                    {% csrf_token %}
+                    <button type="submit" class="text-gray-500 hover:text-[#E0115F] transition-colors p-1.5 rounded-lg hover:bg-gray-800/40">
+                        <svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/></svg>
+                    </button>
+                </form>
             </div>
             {% endfor %}
         </div>
@@ -268,9 +271,12 @@
                         <div class="text-[10px] text-gray-500 font-mono select-all">{{ c.calendar_id }}</div>
                     </div>
                 </div>
-                <a href="{% url 'calendar-delete' c.id %}" onclick="return confirm('Disconnect calendar {{ c.name }}?');" class="text-gray-500 hover:text-[#E0115F] transition-colors p-1.5 rounded-lg hover:bg-gray-800/40">
-                    <svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/></svg>
-                </a>
+                <form method="POST" action="{% url 'calendar-delete' c.id %}" class="inline" onsubmit="return confirm('Disconnect calendar {{ c.name }}?');">
+                    {% csrf_token %}
+                    <button type="submit" class="text-gray-500 hover:text-[#E0115F] transition-colors p-1.5 rounded-lg hover:bg-gray-800/40">
+                        <svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/></svg>
+                    </button>
+                </form>
             </div>
             {% empty %}
             <p class="text-xs text-gray-500 italic pl-2">No active Google Calendar integrations connected.</p>

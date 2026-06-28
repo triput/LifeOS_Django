@@ -14,15 +14,17 @@ scoped workspace handlers, and authentication routes.
 
 import os
 import json
+from django.utils import timezone
 from django.db import models
-from django.db.models import Count, Sum
+from django.db.models import Count, Sum, Q
 from django.shortcuts import render, redirect, get_object_or_404
 from django.http import JsonResponse, HttpResponseForbidden, HttpResponse
 from django.contrib.contenttypes.models import ContentType
 from django.contrib.auth import login as auth_login, logout as auth_logout
 from django.contrib.auth.forms import AuthenticationForm
-from django.utils import timezone
 from django.contrib import messages
+from django.contrib.auth.decorators import login_required
+from django.views.decorators.http import require_POST
 from django.core.exceptions import ValidationError
 from django.core import serializers
 
@@ -262,6 +264,8 @@ def task_action_view(request):
     return JsonResponse({'error': 'Invalid action'}, status=400)
 
 
+@login_required
+@require_POST
 def toggle_task(request, task_id):
     """
     Toggles completion state on an ExecutionItem.
@@ -338,7 +342,7 @@ def triage_view(request):
         parent=None,
         is_archived=False
     ).filter(
-        Q(domain_category__isnull=True) | Q(domain_category='')
+        domain__isnull=True
     ).filter(
         Q(para_category__isnull=True) | Q(para_category='')
     ).order_by('-created_at')
@@ -412,12 +416,10 @@ def process_triage_view(request, item_id):
             try:
                 dom_cat = DomainCategory.objects.get(name=domain)
                 item.domain = dom_cat
-                item.domain_category = dom_cat.name
             except DomainCategory.DoesNotExist:
                 dom_cat = DomainCategory.objects.filter(name=domain).first()
                 if dom_cat:
                     item.domain = dom_cat
-                    item.domain_category = dom_cat.name
         if para:
             item.para_category = para
             
@@ -565,19 +567,22 @@ def settings_view(request):
         if slm_prov:
             settings.slm_provider = slm_prov
         settings.slm_endpoint = request.POST.get('slm_endpoint', settings.slm_endpoint)
-        settings.slm_api_key = request.POST.get('slm_api_key', settings.slm_api_key)
         
         # V5 Settings
         db_url = request.POST.get('database_url')
         if db_url is not None:
-            import dotenv
-            from django.conf import settings as django_settings
-            env_path = django_settings.BASE_DIR / '.env'
-            # Only save if it actually changed
-            current_env = dotenv.dotenv_values(env_path)
-            if current_env.get('DATABASE_URL') != db_url:
-                dotenv.set_key(str(env_path), 'DATABASE_URL', db_url)
-                messages.warning(request, "Database URL changed! You MUST manually restart the Django server for this to take effect.")
+            db_url = db_url.strip()
+            if db_url and not db_url.startswith(('postgresql://', 'postgres://', 'sqlite:///')):
+                messages.error(request, "Invalid Database URL format. Must start with postgresql:// or sqlite:///")
+            else:
+                import dotenv
+                from django.conf import settings as django_settings
+                env_path = django_settings.BASE_DIR / '.env'
+                # Only save if it actually changed
+                current_env = dotenv.dotenv_values(env_path)
+                if current_env.get('DATABASE_URL') != db_url:
+                    dotenv.set_key(str(env_path), 'DATABASE_URL', db_url)
+                    messages.warning(request, "Database URL changed! You MUST manually restart the Django server for this to take effect.")
 
         settings.save()
         messages.success(request, "Settings updated successfully!")
@@ -625,6 +630,8 @@ def domain_add_view(request):
     return redirect('settings')
 
 
+@login_required
+@require_POST
 def domain_delete_view(request, domain_id):
     domain = get_object_or_404(DomainCategory, id=domain_id)
     name = domain.name
@@ -644,8 +651,10 @@ def calendar_add_view(request):
     return redirect('settings')
 
 
-def calendar_delete_view(request, cal_id):
-    cal = get_object_or_404(GoogleCalendar, id=cal_id)
+@login_required
+@require_POST
+def calendar_delete_view(request, calendar_id):
+    cal = get_object_or_404(GoogleCalendar, id=calendar_id)
     name = cal.name
     cal.delete()
     messages.success(request, f"Calendar '{name}' disconnected.")
@@ -825,16 +834,18 @@ def explorer_add_child_view(request):
         
         if parent_type == 'container':
             parent_container = get_object_or_404(WorkspaceContainer, id=parent_id)
-            new_item.content_type = ContentType.objects.get_for_model(WorkspaceContainer)
-            new_item.object_id = parent_container.id
-            new_item.domain_category = parent_container.domain_category
-            new_item.para_category = parent_container.para_category
+            if parent_container:
+                new_item.content_type = ContentType.objects.get_for_model(WorkspaceContainer)
+                new_item.object_id = parent_container.id
+                new_item.domain = parent_container.domain
+                new_item.para_category = parent_container.para_category
         elif parent_type == 'task':
             parent_task = get_object_or_404(ExecutionItem, id=parent_id)
-            new_item.content_type = ContentType.objects.get_for_model(ExecutionItem)
-            new_item.object_id = parent_task.id
-            new_item.domain_category = parent_task.domain_category
-            new_item.para_category = parent_task.para_category
+            if parent_task:
+                new_item.content_type = ContentType.objects.get_for_model(ExecutionItem)
+                new_item.object_id = parent_task.id
+                new_item.domain = parent_task.domain
+                new_item.para_category = parent_task.para_category
             
         new_item.save()
         
@@ -913,15 +924,13 @@ def explorer_edit_view(request, node_type, node_id):
             container.title = request.POST.get('title', container.title)
             container.container_type = request.POST.get('container_type', container.container_type)
             
-            dom_name = request.POST.get('domain_category')
-            if dom_name:
-                dom_cat = DomainCategory.objects.filter(name=dom_name).first()
+            dom_id = request.POST.get('domain_id')
+            if dom_id:
+                dom_cat = DomainCategory.objects.filter(id=dom_id).first()
                 if dom_cat:
                     container.domain = dom_cat
-                    container.domain_category = dom_cat.name
             else:
                 container.domain = None
-                container.domain_category = ''
                 
             container.para_category = request.POST.get('para_category', container.para_category)
             
@@ -981,15 +990,13 @@ def explorer_edit_view(request, node_type, node_id):
             item.priority = request.POST.get('priority', item.priority)
             item.urgency = request.POST.get('urgency', item.urgency)
             
-            dom_name = request.POST.get('domain_category')
-            if dom_name:
-                dom_cat = DomainCategory.objects.filter(name=dom_name).first()
+            dom_id = request.POST.get('domain_id')
+            if dom_id:
+                dom_cat = DomainCategory.objects.filter(id=dom_id).first()
                 if dom_cat:
                     item.domain = dom_cat
-                    item.domain_category = dom_cat.name
             else:
                 item.domain = None
-                item.domain_category = ''
                 
             item.para_category = request.POST.get('para_category', item.para_category)
             
@@ -1112,7 +1119,7 @@ def explorer_bulk_action_view(request):
 def analytics_view(request):
     domain_time = ExecutionItem.objects.filter(
         is_deleted=False
-    ).values('domain_category').annotate(
+    ).values('domain__name').annotate(
         seconds=Sum('time_spent_seconds'),
         count=Count('id')
     )
@@ -1129,7 +1136,7 @@ def analytics_view(request):
     ).order_by('-time_spent_seconds')[:7]
     
     chart_data = {
-        'domain_labels': [d['domain_category'] or 'Uncategorized' for d in domain_time],
+        'domain_labels': [d['domain__name'] or 'Uncategorized' for d in domain_time],
         'domain_minutes': [int((d['seconds'] or 0) / 60) for d in domain_time],
         'domain_counts': [d['count'] for d in domain_time],
         'status_labels': [s['status'] for s in status_counts],
@@ -1150,9 +1157,9 @@ def analytics_drilldown_view(request):
     
     if chart_type == 'domain':
         if category == 'Uncategorized':
-            items = items.filter(domain_category=None)
+            items = items.filter(domain__isnull=True)
         else:
-            items = items.filter(domain_category=category)
+            items = items.filter(domain__name=category)
     elif chart_type == 'status':
         items = items.filter(status=category)
         
@@ -1162,6 +1169,8 @@ def analytics_drilldown_view(request):
 
 
 # Focus Pins
+@login_required
+@require_POST
 def toggle_pin_view(request, item_id):
     item = get_object_or_404(ExecutionItem, id=item_id, is_deleted=False)
     item.is_pinned = not item.is_pinned
@@ -1220,6 +1229,8 @@ def certification_add_view(request):
     return redirect('academy')
 
 
+@login_required
+@require_POST
 def certification_delete_view(request, cert_id):
     cert = get_object_or_404(Certification, id=cert_id)
     title = cert.title

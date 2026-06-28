@@ -32,7 +32,7 @@ class ExecutionItemInline(GenericTabularInline):
     """
     model = ExecutionItem
     extra = 1
-    fields = ('title', 'item_type', 'domain_category', 'para_category', 'is_completed', 'is_archived', 'is_deleted')
+    fields = ('title', 'item_type', 'domain', 'para_category', 'is_completed', 'is_archived', 'is_deleted')
 
 
 @admin.register(WorkspaceContainer)
@@ -40,8 +40,8 @@ class WorkspaceContainerAdmin(admin.ModelAdmin):
     """
     Admin configuration for type-discriminated structural containers.
     """
-    list_display = ('title', 'container_type', 'parent', 'domain_category', 'para_category', 'is_archived', 'created_at')
-    list_filter = ('container_type', 'domain_category', 'para_category', 'is_archived')
+    list_display = ('title', 'container_type', 'parent', 'domain', 'para_category', 'is_archived', 'created_at')
+    list_filter = ('container_type', 'domain', 'para_category', 'is_archived')
     search_fields = ('title',)
     ordering = ('container_type', 'order', 'title')
     inlines = [ExecutionItemInline]
@@ -52,8 +52,8 @@ class ExecutionItemAdmin(admin.ModelAdmin):
     """
     Admin configuration for actionable tasks and activities.
     """
-    list_display = ('title', 'item_type', 'content_object', 'domain_category', 'para_category', 'is_completed', 'is_active', 'is_archived', 'is_deleted')
-    list_filter = ('item_type', 'domain_category', 'para_category', 'is_completed', 'is_active', 'is_archived', 'is_deleted')
+    list_display = ('title', 'item_type', 'content_object', 'domain', 'para_category', 'is_completed', 'is_active', 'is_archived', 'is_deleted')
+    list_filter = ('item_type', 'domain', 'para_category', 'is_completed', 'is_active', 'is_archived', 'is_deleted')
     search_fields = ('title',)
     ordering = ('-created_at',)
 

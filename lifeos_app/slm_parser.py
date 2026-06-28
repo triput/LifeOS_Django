@@ -72,7 +72,12 @@ def parse_natural_language_constraints(text: str) -> dict:
         }
         
         try:
-            response = requests.post(url, json=payload, timeout=30)
+            headers = {}
+            import os
+            api_key = os.environ.get('SLM_API_KEY')
+            if api_key:
+                headers['Authorization'] = f"Bearer {api_key}"
+            response = requests.post(url, json=payload, headers=headers, timeout=30)
             response.raise_for_status()
             data = response.json()
             raw_response = data.get('response', '{}')

@@ -13,6 +13,7 @@ and ExecutionItem (for actionable items), along with system preferences (AppSett
 """
 
 from django.db import models
+from django.db.models import Sum
 from django.contrib.contenttypes.fields import GenericForeignKey
 from django.contrib.contenttypes.models import ContentType
 from django.core.exceptions import ValidationError
@@ -64,7 +65,6 @@ class AppSettings(models.Model):
         default='Local Ollama'
     )
     slm_endpoint = models.CharField(max_length=255, default='http://localhost:11434/api/generate')
-    slm_api_key = models.CharField(max_length=255, blank=True)
 
     def save(self, *args, **kwargs):
         self.pk = 1
@@ -100,14 +100,6 @@ class WorkspaceContainer(models.Model):
         ('Module', 'Module'),
     ]
 
-    DOMAIN_CATEGORIES = [
-        ('Tech/Career', 'Tech/Career'),
-        ('Theater', 'Theater'),
-        ('Academy', 'Academy'),
-        ('Home', 'Home'),
-        ('Governance/Compliance', 'Governance/Compliance'),
-    ]
-
     PARA_CATEGORIES = [
         ('Projects', 'Projects'),
         ('Areas', 'Areas'),
@@ -126,9 +118,6 @@ class WorkspaceContainer(models.Model):
     created_at = models.DateTimeField(auto_now_add=True)
     
     # Category markers (FR-DATA-004)
-    domain_category = models.CharField(
-        max_length=100, null=True, blank=True, db_index=True
-    )
     domain = models.ForeignKey(
         DomainCategory, on_delete=models.SET_NULL, null=True, blank=True, related_name='containers'
     )
@@ -182,8 +171,14 @@ class WorkspaceContainer(models.Model):
         # 2. Add time of child tasks directly parented to this container
         container_ct = ContentType.objects.get_for_model(WorkspaceContainer)
         items = ExecutionItem.objects.filter(content_type=container_ct, object_id=self.id, is_deleted=False)
+        
+        # Optimization: Aggregate direct time
+        direct_sum = items.aggregate(Sum('time_spent_seconds'))['time_spent_seconds__sum'] or 0
+        total += direct_sum
+        
+        # Add subtask recursive time (excluding direct time since we just added it)
         for item in items:
-            total += item.get_total_time_spent_seconds()
+            total += (item.get_total_time_spent_seconds() - item.time_spent_seconds)
         return total
 
     @property
@@ -201,17 +196,8 @@ class ExecutionItem(models.Model):
     """
     ITEM_TYPES = [
         ('Task', 'Task'),
-        ('Subtask', 'Subtask'),
         ('LearningTask', 'LearningTask'),
         ('LifeActivity', 'LifeActivity'),
-    ]
-
-    DOMAIN_CATEGORIES = [
-        ('Tech/Career', 'Tech/Career'),
-        ('Theater', 'Theater'),
-        ('Academy', 'Academy'),
-        ('Home', 'Home'),
-        ('Governance/Compliance', 'Governance/Compliance'),
     ]
 
     PARA_CATEGORIES = [
@@ -226,6 +212,7 @@ class ExecutionItem(models.Model):
         ('Backlog', 'Backlog'),
         ('Planned', 'Planned'),
         ('In Progress', 'In Progress'),
+        ('Blocked', 'Blocked'),
         ('Completed', 'Completed'),
     ]
 
@@ -260,9 +247,6 @@ class ExecutionItem(models.Model):
     started_at = models.DateTimeField(null=True, blank=True)
 
     # Category markers (FR-DATA-004)
-    domain_category = models.CharField(
-        max_length=100, null=True, blank=True, db_index=True
-    )
     domain = models.ForeignKey(
         DomainCategory, on_delete=models.SET_NULL, null=True, blank=True, related_name='items'
     )
@@ -310,8 +294,16 @@ class ExecutionItem(models.Model):
         is_new_completion = False
         if self.pk:
             old_self = ExecutionItem.objects.filter(pk=self.pk).first()
-            if old_self and not old_self.is_completed and (self.status == 'Completed' or self.is_completed):
-                is_new_completion = True
+            if old_self:
+                if not old_self.is_completed and (self.status == 'Completed' or self.is_completed):
+                    is_new_completion = True
+                
+                # FUNC-5: Sync when un-completing
+                if old_self.status == 'Completed' and self.status != 'Completed':
+                    self.is_completed = False
+                elif old_self.is_completed and not self.is_completed:
+                    if self.status == 'Completed':
+                        self.status = 'Planned'
         
         # Sync completion flags (FR-LIFECYCLE-001)
         if self.status == 'Completed':
@@ -319,9 +311,12 @@ class ExecutionItem(models.Model):
         elif self.is_completed:
             self.status = 'Completed'
         
-        # If the item has a parent, it shouldn't default to Inbox status if it's placed in a container
+        # SPEC-6 & FUNC-4: Default to Backlog if no dates when triaged
         if (self.content_type is not None or self.object_id is not None) and self.status == 'Inbox':
-            self.status = 'Planned'
+            if self.start_date or self.due_date:
+                self.status = 'Planned'
+            else:
+                self.status = 'Backlog'
 
         super().save(*args, **kwargs)
         
@@ -377,7 +372,6 @@ class ExecutionItem(models.Model):
             object_id=self.object_id,
             duration_estimate=self.duration_estimate,
             domain=self.domain,
-            domain_category=self.domain_category,
             para_category=self.para_category,
             priority=self.priority,
             start_date=new_start,
@@ -393,13 +387,17 @@ class ExecutionItem(models.Model):
         )
 
     def get_total_time_spent_seconds(self):
-        # Direct task focus time + manual extra time
         total = self.time_spent_seconds + self.extra_actual_seconds
-        # Find child subtasks parented to this ExecutionItem
-        task_ct = ContentType.objects.get_for_model(ExecutionItem)
-        subtasks = ExecutionItem.objects.filter(content_type=task_ct, object_id=self.id, is_deleted=False)
-        for sub in subtasks:
-            total += sub.get_total_time_spent_seconds()
+        item_ct = ContentType.objects.get_for_model(ExecutionItem)
+        subitems = ExecutionItem.objects.filter(content_type=item_ct, object_id=self.id, is_deleted=False)
+        
+        # Optimization: Aggregate direct time
+        direct_sum = subitems.aggregate(Sum('time_spent_seconds'))['time_spent_seconds__sum'] or 0
+        total += direct_sum
+        
+        # Add sub-subtask recursive time
+        for sub in subitems:
+            total += (sub.get_total_time_spent_seconds() - sub.time_spent_seconds)
         return total
 
     @property
@@ -470,9 +468,18 @@ class NotionIntegration(models.Model):
     execution_item = models.OneToOneField(
         ExecutionItem, on_delete=models.SET_NULL, null=True, blank=True, related_name='notion_link'
     )
+    container = models.OneToOneField(
+        WorkspaceContainer, on_delete=models.SET_NULL, null=True, blank=True, related_name='notion_link'
+    )
 
     def __str__(self):
-        return f"Notion integration for {self.execution_item.title}"
+        return f"Notion integration for {self.execution_item.title if self.execution_item else self.container.title if self.container else 'Unknown'}"
+        
+    def clean(self):
+        super().clean()
+        if (self.execution_item and self.container) or (not self.execution_item and not self.container):
+            from django.core.exceptions import ValidationError
+            raise ValidationError("NotionIntegration must link to exactly one ExecutionItem or WorkspaceContainer.")
 
 
 # Utility helpers for human-readable duration strings
@@ -592,3 +599,4 @@ class ScheduledTaskAllocation(models.Model):
 
     def __str__(self):
         return f"Allocated: {self.execution_item.title} at {self.start_time}"
+

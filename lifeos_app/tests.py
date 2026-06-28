@@ -99,17 +99,18 @@ class LifeOSDataLifecycleTestCase(TestCase):
     """
     def setUp(self):
         # Create base containers
+        self.domain = DomainCategory.objects.get_or_create(name='Tech/Career')[0]
         self.epic = WorkspaceContainer.objects.create(
             title='Tech Career',
             container_type='Epic',
-            domain_category='Tech/Career',
+            domain=self.domain,
             para_category='Areas'
         )
         self.project = WorkspaceContainer.objects.create(
             title='LifeOS Development',
             container_type='Project',
             parent=self.epic,
-            domain_category='Tech/Career',
+            domain=self.domain,
             para_category='Projects'
         )
         
@@ -121,7 +122,7 @@ class LifeOSDataLifecycleTestCase(TestCase):
             item_type='Task',
             content_type=self.container_type,
             object_id=self.project.id,
-            domain_category='Tech/Career',
+            domain=self.domain,
             para_category='Projects',
             duration_estimate=60,
             time_spent_seconds=3600
@@ -152,7 +153,7 @@ class LifeOSDataLifecycleTestCase(TestCase):
 
         re_fetched = ExecutionItem.objects.get(id=self.task.id)
         self.assertTrue(re_fetched.is_archived)
-        self.assertEqual(re_fetched.domain_category, 'Tech/Career')
+        self.assertEqual(re_fetched.domain.name, 'Tech/Career')
         self.assertEqual(re_fetched.para_category, 'Projects')
         self.assertEqual(re_fetched.time_spent_seconds, 3600)
 
@@ -164,16 +165,17 @@ class LifeOSWorkspaceTestCase(TestCase):
     def setUp(self):
         self.owner = User.objects.create_superuser(username='owner', password='p', email='e')
         
+        self.domain = DomainCategory.objects.get_or_create(name='Academy')[0]
         self.container_active = WorkspaceContainer.objects.create(
             title='Active Course',
             container_type='Course',
-            domain_category='Academy',
+            domain=self.domain,
             para_category='Areas'
         )
         self.container_archived = WorkspaceContainer.objects.create(
             title='Archived Course',
             container_type='Course',
-            domain_category='Academy',
+            domain=self.domain,
             para_category='Areas',
             is_archived=True
         )
@@ -186,7 +188,7 @@ class LifeOSWorkspaceTestCase(TestCase):
             item_type='LearningTask',
             content_type=self.container_type,
             object_id=self.container_active.id,
-            domain_category='Academy',
+            domain=self.domain,
             para_category='Areas'
         )
         self.task_completed = ExecutionItem.objects.create(
@@ -195,7 +197,7 @@ class LifeOSWorkspaceTestCase(TestCase):
             is_completed=True,
             content_type=self.container_type,
             object_id=self.container_active.id,
-            domain_category='Academy',
+            domain=self.domain,
             para_category='Areas'
         )
         self.task_deleted = ExecutionItem.objects.create(
@@ -204,7 +206,7 @@ class LifeOSWorkspaceTestCase(TestCase):
             is_deleted=True,
             content_type=self.container_type,
             object_id=self.container_active.id,
-            domain_category='Academy',
+            domain=self.domain,
             para_category='Areas'
         )
         self.client = Client()
@@ -290,10 +292,11 @@ class LifeOSV2FeaturesTestCase(TestCase):
     """
     def setUp(self):
         self.owner = User.objects.create_superuser(username='owner_trish', password='StrongSecurePassword123!', email='trish@lifeos.lan')
+        self.domain = DomainCategory.objects.get_or_create(name='Academy')[0]
         self.container = WorkspaceContainer.objects.create(
             title='Epic CS', 
             container_type='Epic', 
-            domain_category='Academy', 
+            domain=self.domain, 
             para_category='Areas'
         )
         self.client = Client()
@@ -390,14 +393,14 @@ class LifeOSV2FeaturesTestCase(TestCase):
         self.assertFalse(item.is_pinned)
 
         # Toggle Pin
-        response = self.client.get(reverse('toggle-pin', args=[item.id]))
+        response = self.client.post(reverse('toggle-pin', args=[item.id]))
         self.assertEqual(response.status_code, 302)
         
         item.refresh_from_db()
         self.assertTrue(item.is_pinned)
 
         # Toggle back
-        self.client.get(reverse('toggle-pin', args=[item.id]))
+        self.client.post(reverse('toggle-pin', args=[item.id]))
         item.refresh_from_db()
         self.assertFalse(item.is_pinned)
 
@@ -459,11 +462,13 @@ class LifeOSV3FeaturesTestCase(TestCase):
         self.client.login(username='owner_v3', password='pw')
 
         # Create base academic domain
-        self.domain = DomainCategory.objects.create(
+        self.domain, _ = DomainCategory.objects.get_or_create(
             name='Special Academy',
-            color='#9966CC',
-            icon='academic-cap',
-            is_academy=True
+            defaults={
+                'color': '#9966CC',
+                'icon': 'academic-cap',
+                'is_academy': True
+            }
         )
 
     def test_dynamic_domains(self):
@@ -480,7 +485,7 @@ class LifeOSV3FeaturesTestCase(TestCase):
         
         # Test deletion
         target = DomainCategory.objects.get(name='Home Tasks')
-        response = self.client.get(reverse('domain-delete', args=[target.id]))
+        response = self.client.post(reverse('domain-delete', args=[target.id]))
         self.assertEqual(response.status_code, 302)
         self.assertFalse(DomainCategory.objects.filter(name='Home Tasks').exists())
 
@@ -501,8 +506,7 @@ class LifeOSV3FeaturesTestCase(TestCase):
         epic = WorkspaceContainer.objects.create(
             title='Study Epic',
             container_type='Epic',
-            domain=self.domain,
-            domain_category=self.domain.name
+            domain=self.domain
         )
         task = ExecutionItem.objects.create(
             title='Main Task',
@@ -731,7 +735,7 @@ class V5FeatureTests(TestCase):
         self.client = Client()
         self.client.login(username='owner_trish', password='StrongSecurePassword123!')
         
-        self.domain = DomainCategory.objects.create(name="Engineering")
+        self.domain = DomainCategory.objects.get_or_create(name="Engineering")[0]
         
         # Create some tags
         self.tag_urgent = Tag.objects.create(name="Urgent", color="#FF0000")
@@ -743,7 +747,6 @@ class V5FeatureTests(TestCase):
             title="V5 Engine Upgrade",
             container_type="Project",
             domain=self.domain,
-            domain_category="Engineering",
             priority="High",
             urgency="Immediate"
         )

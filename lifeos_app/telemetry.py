@@ -100,13 +100,43 @@ class NoaaKpAdapter:
             response.raise_for_status()
             data = response.json()
             
+            if isinstance(data, dict) and "data" in data:
+                data = data["data"]
+                
             if isinstance(data, list) and len(data) > 0:
-                # The response is sorted chronologically, get the latest entry
                 latest = data[-1]
-                kp = latest.get("Kp")
-                time_tag = latest.get("time_tag", "")
-                # Format time tag to HH:MM
-                time_str = time_tag.split("T")[1] if "T" in time_tag else ""
+                kp = None
+                time_tag = ""
+                
+                if isinstance(latest, dict):
+                    kp = latest.get("Kp")
+                    time_tag = latest.get("time_tag", "")
+                elif isinstance(latest, list) and len(data) > 1:
+                    # Array of arrays, data[0] is header
+                    header = data[0]
+                    if isinstance(header, list):
+                        try:
+                            kp_idx = header.index("Kp")
+                            time_idx = header.index("time_tag")
+                        except ValueError:
+                            kp_idx = 1
+                            time_idx = 0
+                    else:
+                        kp_idx = 1
+                        time_idx = 0
+                        
+                    if len(latest) > max(kp_idx, time_idx):
+                        kp = latest[kp_idx]
+                        time_tag = latest[time_idx]
+                    
+                # Format time tag to HH:MM (NOAA time format e.g. "2023-11-20 03:00:00.000")
+                time_str = ""
+                if time_tag:
+                    parts = time_tag.split(" ")
+                    if len(parts) > 1:
+                        time_str = parts[1][:5]
+                    elif "T" in time_tag:
+                        time_str = time_tag.split("T")[1][:5]
                 
                 # Formulate status warning based on Kp index scale
                 # Kp >= 5 means geomagnetic storm active

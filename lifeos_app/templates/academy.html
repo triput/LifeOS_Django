@@ -32,9 +32,12 @@
                             <h4 class="font-bold text-gray-200 text-sm">{{ cert.title }}</h4>
                             <p class="text-[10px] text-gray-500 mt-0.5">Achieved: {{ cert.achieved_date|date:"Y-m-d"|default:"N/A" }}</p>
                         </div>
-                        <a href="{% url 'certification-delete' cert.id %}" onclick="return confirm('Remove certification {{ cert.title }}?');" class="text-gray-600 hover:text-[#E0115F] opacity-0 group-hover:opacity-100 transition-opacity p-1">
-                            <svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/></svg>
-                        </a>
+                        <form method="POST" action="{% url 'certification-delete' cert.id %}" class="inline" onsubmit="return confirm('Remove certification {{ cert.title }}?');">
+                            {% csrf_token %}
+                            <button type="submit" class="text-gray-600 hover:text-[#E0115F] opacity-0 group-hover:opacity-100 transition-opacity p-1">
+                                <svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/></svg>
+                            </button>
+                        </form>
                     </div>
 
                     <!-- Progress bar -->
@@ -150,11 +153,14 @@
                         <h4 class="text-sm font-bold text-gray-200 leading-tight mt-2.5 line-clamp-2">{{ task.title }}</h4>
                     </div>
                     <!-- Quick complete -->
-                    <a href="{% url 'toggle_task' task.id %}" class="text-gray-500 hover:text-[#50C878] p-1 rounded-lg hover:bg-gray-800/40 transition-colors">
-                        <svg class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
-                        </svg>
-                    </a>
+                    <form method="POST" action="{% url 'toggle_task' task.id %}" class="inline">
+                        {% csrf_token %}
+                        <button type="submit" class="text-gray-500 hover:text-[#50C878] p-1 rounded-lg hover:bg-gray-800/40 transition-colors">
+                            <svg class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+                            </svg>
+                        </button>
+                    </form>
                 </div>
 
                 <div class="mt-4 pt-3 border-t border-gray-800/50 flex items-center justify-between">

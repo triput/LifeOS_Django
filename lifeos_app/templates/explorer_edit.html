@@ -202,10 +202,10 @@
         <div class="grid grid-cols-2 gap-4 border-t border-gray-800/60 pt-4">
             <div>
                 <label class="block text-xs font-bold text-gray-400 uppercase tracking-wider mb-1.5">Domain Category</label>
-                <select name="domain_category" class="w-full bg-[#0B0F19] text-gray-200 border border-gray-800 focus:ring-2 focus:ring-[#9966CC] focus:border-transparent rounded-lg p-3 text-sm">
+                <select name="domain_id" class="w-full bg-[#0B0F19] text-gray-200 border border-gray-800 focus:ring-2 focus:ring-[#9966CC] focus:border-transparent rounded-lg p-3 text-sm">
                     <option value="">-- None --</option>
                     {% for d in domains %}
-                    <option value="{{ d.name }}" {% if node_type == 'container' %}{% if d.name == container.domain_category %}selected{% endif %}{% else %}{% if d.name == item.domain_category %}selected{% endif %}{% endif %}>{{ d.name }}</option>
+                    <option value="{{ d.id }}" {% if node_type == 'container' %}{% if d.id == container.domain_id %}selected{% endif %}{% else %}{% if d.id == item.domain_id %}selected{% endif %}{% endif %}>{{ d.name }}</option>
                     {% endfor %}
                 </select>
             </div>

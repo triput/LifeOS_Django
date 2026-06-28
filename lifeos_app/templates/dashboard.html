@@ -64,19 +64,24 @@
                         
                         <div class="flex items-center space-x-1.5">
                             <!-- Pin toggle -->
-                            <a href="{% url 'toggle-pin' task.id %}" 
-                               title="{% if task.is_pinned %}Unpin from Today{% else %}Pin to Today's Agenda{% endif %}"
-                               class="text-gray-500 hover:bg-gray-800/50 p-1 rounded-lg transition-colors {% if task.is_pinned %}text-[#E0115F]{% else %}hover:text-[#E0115F]{% endif %}">
-                                <svg class="h-4 w-4 fill-current" viewBox="0 0 20 20">
-                                    <path fill-rule="evenodd" d="M10 2a1 1 0 01.993.883L11 3v4.585l1.707 1.707a1 1 0 01.283.566l.01.142V11a1 1 0 01-.883.993L12 12h-1v5a1 1 0 01-1.993.117L9 17v-5H8a1 1 0 01-.993-.883L7 11V9.998a1 1 0 01.293-.707L9 7.584V3a1 1 0 011-1z" clip-rule="evenodd"/>
-                                </svg>
-                            </a>
+                            <form method="POST" action="{% url 'toggle-pin' task.id %}" class="inline">
+                                {% csrf_token %}
+                                <button type="submit" title="{% if task.is_pinned %}Unpin from Today{% else %}Pin to Today's Agenda{% endif %}"
+                                   class="text-gray-500 hover:bg-gray-800/50 p-1 rounded-lg transition-colors {% if task.is_pinned %}text-[#E0115F]{% else %}hover:text-[#E0115F]{% endif %}">
+                                    <svg class="h-4 w-4 fill-current" viewBox="0 0 20 20">
+                                        <path fill-rule="evenodd" d="M10 2a1 1 0 01.993.883L11 3v4.585l1.707 1.707a1 1 0 01.283.566l.01.142V11a1 1 0 01-.883.993L12 12h-1v5a1 1 0 01-1.993.117L9 17v-5H8a1 1 0 01-.993-.883L7 11V9.998a1 1 0 01.293-.707L9 7.584V3a1 1 0 011-1z" clip-rule="evenodd"/>
+                                    </svg>
+                                </button>
+                            </form>
                             <!-- Complete check -->
-                            <a href="{% url 'toggle_task' task.id %}" class="text-gray-500 hover:text-[#50C878] p-1 rounded-lg hover:bg-gray-800/40 transition-colors">
-                                <svg class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
-                                </svg>
-                            </a>
+                            <form method="POST" action="{% url 'toggle_task' task.id %}" class="inline">
+                                {% csrf_token %}
+                                <button type="submit" class="text-gray-500 hover:text-[#50C878] p-1 rounded-lg hover:bg-gray-800/40 transition-colors">
+                                    <svg class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+                                    </svg>
+                                </button>
+                            </form>
                         </div>
                     </div>
 

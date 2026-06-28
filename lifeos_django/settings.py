@@ -15,7 +15,7 @@ BASE_DIR = Path(__file__).resolve().parent.parent
 load_dotenv(os.path.join(BASE_DIR, '.env'))
 
 # Security: Keep this safe!
-SECRET_KEY = os.environ.get("SECRET_KEY", "django-insecure-default-key-change-me")
+SECRET_KEY = os.environ["SECRET_KEY"]
 DEBUG = os.environ.get("DEBUG", "True") == "True"
 ALLOWED_HOSTS = ["localhost", "127.0.0.1"]
 
