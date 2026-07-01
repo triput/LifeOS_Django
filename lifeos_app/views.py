@@ -4,7 +4,7 @@
 # Component: Core / Views
 # Version: 1.0 (Gold Master)
 # Created: 2026-06-26
-# Last Update: 2026-06-28
+# Last Update: 2026-06-30
 # ==============================================================================
 """View controllers for the LifeOS application.
 
@@ -2737,3 +2737,41 @@ def container_check_bounds_view(request, container_id):
                 })
                 
     return JsonResponse({'conflicts': conflicts})
+
+
+@login_required
+def user_management_view(request):
+    """
+    Renders the User Management dashboard (Settings > Users) (FR-SEC-003).
+    Only accessible to superusers.
+    """
+    if not request.user.is_superuser:
+        return HttpResponseForbidden("Forbidden: Only the system owner has access to User Management.")
+    
+    from django.contrib.auth.models import User
+    users = User.objects.all().order_by('-date_joined')
+    return render(request, 'user_management.html', {'users_list': users})
+
+
+@login_required
+@require_POST
+def delete_user_view(request, user_id):
+    """
+    Handles user account deletions (FR-SEC-003).
+    Only accessible to superusers. Prevents self-deletion.
+    """
+    if not request.user.is_superuser:
+        return HttpResponseForbidden("Forbidden: Only the system owner can delete users.")
+    
+    from django.contrib.auth.models import User
+    user_to_delete = get_object_or_404(User, id=user_id)
+    
+    # Self-deletion prevention
+    if user_to_delete == request.user:
+        messages.error(request, "Error: You cannot delete your own logged-in account.")
+        return redirect('user-management')
+        
+    username = user_to_delete.username
+    user_to_delete.delete()
+    messages.success(request, f"User '{username}' was successfully deleted.")
+    return redirect('user-management')

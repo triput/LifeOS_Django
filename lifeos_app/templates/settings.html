@@ -486,6 +486,42 @@
         </form>
     </div>
 
+    <!-- User Management & Security -->
+    <div class="bg-[#0D111D] border border-gray-800/80 rounded-2xl p-8 shadow-xl space-y-6">
+        <div class="border-b border-gray-800 pb-2">
+            <h3 class="text-base font-bold text-gray-200">Security & User Accounts</h3>
+            <p class="text-xs text-gray-400 mt-1">Manage system access accounts, user deletions, and password settings.</p>
+        </div>
+
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <!-- User Management Link -->
+            <a href="{% url 'user-management' %}" class="p-4 bg-[#0B0F19] border border-gray-800 rounded-xl hover:border-[#9966CC]/60 flex items-center justify-between shadow-sm group transition-all">
+                <div class="space-y-1">
+                    <h4 class="text-sm font-bold text-gray-300 group-hover:text-white transition-colors">User Account Manager</h4>
+                    <p class="text-xs text-gray-500">View registered users, dates joined, and perform account deletions.</p>
+                </div>
+                <span class="p-2 bg-[#9966CC]/15 text-[#9966CC] rounded-lg group-hover:bg-[#9966CC]/20 transition-colors">
+                    <svg class="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197M13 7a4 4 0 11-8 0 4 4 0 018 0z" />
+                    </svg>
+                </span>
+            </a>
+
+            <!-- Change Password Link -->
+            <a href="{% url 'password_change' %}" class="p-4 bg-[#0B0F19] border border-gray-800 rounded-xl hover:border-[#9966CC]/60 flex items-center justify-between shadow-sm group transition-all">
+                <div class="space-y-1">
+                    <h4 class="text-sm font-bold text-gray-300 group-hover:text-white transition-colors">Change Password</h4>
+                    <p class="text-xs text-gray-500">Update the password for your active authenticated session.</p>
+                </div>
+                <span class="p-2 bg-emerald-500/15 text-emerald-400 rounded-lg group-hover:bg-emerald-500/20 transition-colors">
+                    <svg class="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 7a2 2 0 012 2m-5 8h.01M19 21V9a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2h12a2 2 0 002-2zM9 13a1 1 0 11-2 0 1 1 0 012 0z" />
+                    </svg>
+                </span>
+            </a>
+        </div>
+    </div>
+
     <!-- Diagnostic Panel -->
     <div class="bg-[#0D111D] border border-gray-800/80 rounded-2xl p-8 shadow-xl space-y-6">
         <div class="border-b border-gray-800 pb-2">

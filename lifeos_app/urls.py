@@ -4,7 +4,7 @@
 # Component: Core / URL Configuration
 # Version: 1.0 (Gold Master)
 # Created: 2026-06-26
-# Last Update: 2026-06-26
+# Last Update: 2026-06-30
 # ==============================================================================
 from django.urls import path
 from . import views
@@ -31,6 +31,8 @@ urlpatterns = [
     path('settings/backup/', views.backup_view, name='backup'),
     path('settings/domain/add/', views.domain_add_view, name='domain-add'),
     path('settings/domain/delete/<int:domain_id>/', views.domain_delete_view, name='domain-delete'),
+    path('settings/users/', views.user_management_view, name='user-management'),
+    path('settings/users/delete/<int:user_id>/', views.delete_user_view, name='delete-user'),
     path('settings/container/check-bounds/<int:container_id>/', views.container_check_bounds_view, name='container-check-bounds'),
     
     # Calendar OAuth Endpoints

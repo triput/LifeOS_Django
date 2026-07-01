@@ -4,7 +4,7 @@
 # Component: Core / Automated Testing
 # Version: 1.0 (Gold Master)
 # Created: 2026-06-26
-# Last Update: 2026-06-28
+# Last Update: 2026-06-30
 # ==============================================================================
 """Automated verification suite for the LifeOS application.
 
@@ -91,6 +91,54 @@ class LifeOSSecurityTestCase(TestCase):
         # Returns 403 Forbidden
         self.assertEqual(response.status_code, 403)
         self.assertContains(response, "You are not authorized to access this LifeOS", status_code=403)
+
+    def test_user_management_access_owner(self):
+        """Owner can access the user management page."""
+        self.client.login(username='owner_trish', password='StrongSecurePassword123!')
+        response = self.client.get(reverse('user-management'))
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "User Account Manager")
+
+    def test_user_management_access_non_owner(self):
+        """Authenticated non-owner is forbidden from accessing the user management page."""
+        self.client.login(username='non_owner_guest', password='AnotherPassword123!')
+        response = self.client.get(reverse('user-management'))
+        self.assertEqual(response.status_code, 403)
+
+    def test_user_management_access_anonymous(self):
+        """Anonymous user is redirected to login from user management page."""
+        response = self.client.get(reverse('user-management'))
+        self.assertRedirects(response, reverse('login'))
+
+    def test_password_reset_access_anonymous(self):
+        """Anonymous user can access the password reset request page without redirect."""
+        response = self.client.get(reverse('password_reset'))
+        self.assertEqual(response.status_code, 200)
+
+    def test_delete_user_success(self):
+        """Owner can successfully delete a non-owner user."""
+        self.client.login(username='owner_trish', password='StrongSecurePassword123!')
+        # Count users before
+        self.assertEqual(User.objects.filter(username='non_owner_guest').count(), 1)
+        response = self.client.post(reverse('delete-user', args=[self.non_owner.id]))
+        self.assertRedirects(response, reverse('user-management'))
+        # Count users after
+        self.assertEqual(User.objects.filter(username='non_owner_guest').count(), 0)
+
+    def test_delete_user_self_prevention(self):
+        """Owner is prevented from deleting their own logged-in account."""
+        self.client.login(username='owner_trish', password='StrongSecurePassword123!')
+        response = self.client.post(reverse('delete-user', args=[self.owner.id]))
+        self.assertRedirects(response, reverse('user-management'))
+        # Account should still exist
+        self.assertEqual(User.objects.filter(username='owner_trish').count(), 1)
+
+    def test_delete_user_non_owner_forbidden(self):
+        """Non-owner user cannot call the deletion endpoint."""
+        self.client.login(username='non_owner_guest', password='AnotherPassword123!')
+        response = self.client.post(reverse('delete-user', args=[self.owner.id]))
+        self.assertEqual(response.status_code, 403)
+        self.assertEqual(User.objects.filter(username='owner_trish').count(), 1)
 
 
 class LifeOSDataLifecycleTestCase(TestCase):

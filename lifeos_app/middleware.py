@@ -4,7 +4,7 @@
 # Component: Core / Security Middleware
 # Version: 1.0 (Gold Master)
 # Created: 2026-06-26
-# Last Update: 2026-06-26
+# Last Update: 2026-06-30
 # ==============================================================================
 """Security middleware to restrict app access to the single configured owner."""
 
@@ -34,9 +34,15 @@ class OwnerOnlyAccessMiddleware:
         except Resolver404:
             view_name = None
 
-        # Exclude login and admin login views from redirect checks
-        exempt_view_names = ['login', 'admin:login', 'logout', 'admin:logout']
-        exempt_paths = ['/login/', '/admin/login/', '/logout/']
+        # Exclude login, admin login, and password reset views from redirect checks
+        exempt_view_names = [
+            'login', 'admin:login', 'logout', 'admin:logout',
+            'password_reset', 'password_reset_done', 'password_reset_confirm', 'password_reset_complete'
+        ]
+        exempt_paths = [
+            '/login/', '/admin/login/', '/logout/',
+            '/password-reset/', '/password-reset/done/', '/password-reset-complete/'
+        ]
 
         is_exempt = (
             view_name in exempt_view_names or 
