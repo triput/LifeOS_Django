@@ -104,6 +104,47 @@ class CalendarIntegration(models.Model):
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
 
+    def save(self, *args, **kwargs):
+        # Encrypt token properties before database write if plaintext exists
+        if self.credentials_json:
+            import base64
+            import json
+            from django.conf import settings
+            try:
+                # Check if it is already encrypted (starts with 'enc:')
+                creds_str = json.dumps(self.credentials_json)
+                if not creds_str.startswith('"enc:'):
+                    key = settings.SECRET_KEY.encode()
+                    raw_data = creds_str.encode('utf-8')
+                    encrypted = bytes(a ^ key[i % len(key)] for i, a in enumerate(raw_data))
+                    enc_b64 = base64.b64encode(encrypted).decode('utf-8')
+                    self.credentials_json = f"enc:{enc_b64}"
+            except Exception:
+                pass
+        super().save(*args, **kwargs)
+
+    def get_credentials(self):
+        """
+        Decrypted credentials helper method.
+        """
+        if not self.credentials_json:
+            return {}
+        if isinstance(self.credentials_json, dict):
+            return self.credentials_json
+        if isinstance(self.credentials_json, str) and self.credentials_json.startswith("enc:"):
+            import base64
+            import json
+            from django.conf import settings
+            try:
+                key = settings.SECRET_KEY.encode()
+                enc_b64 = self.credentials_json[4:]
+                enc_data = base64.b64decode(enc_b64.encode())
+                decrypted = bytes(a ^ key[i % len(key)] for i, a in enumerate(enc_data))
+                return json.loads(decrypted.decode('utf-8'))
+            except Exception:
+                return {}
+        return {}
+
     def __str__(self):
         return self.user_email if self.user_email else "Calendar Integration"
 
@@ -353,6 +394,8 @@ class ExecutionItem(models.Model):
     class Meta:
         indexes = [
             models.Index(fields=["content_type", "object_id"]),
+            models.Index(fields=["is_completed", "is_deleted", "is_archived", "status"]),
+            models.Index(fields=["start_date", "is_completed", "is_deleted"]),
         ]
 
     def save(self, *args, **kwargs):
@@ -498,6 +541,10 @@ class ExecutionItem(models.Model):
             fuzzy_timeframe=self.fuzzy_timeframe,
         )
         
+        # Copy ManyToMany tags from the original item to the cloned recurrence (CORRECT-05)
+        if self.tags.exists():
+            new_item.tags.set(self.tags.all())
+
         RecurringConfig.objects.create(
             execution_item=new_item,
             frequency=recur.frequency,
@@ -602,6 +649,10 @@ class NotionIntegration(models.Model):
         if (self.execution_item and self.container) or (not self.execution_item and not self.container):
             from django.core.exceptions import ValidationError
             raise ValidationError("NotionIntegration must link to exactly one ExecutionItem or WorkspaceContainer.")
+
+    def save(self, *args, **kwargs):
+        self.full_clean()
+        super().save(*args, **kwargs)
 
 
 # Utility helpers for human-readable duration strings

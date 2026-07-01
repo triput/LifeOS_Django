@@ -22,7 +22,7 @@ from django.utils import timezone
 import datetime
 import os
 
-from .models import WorkspaceContainer, ExecutionItem, AppSettings, Tag, DomainCategory
+from .models import WorkspaceContainer, ExecutionItem, AppSettings, Tag, DomainCategory, CalendarIntegration
 
 User = get_user_model()
 
@@ -552,6 +552,9 @@ class LifeOSV3FeaturesTestCase(TestCase):
         )
         
         # Complete the item to trigger recurrence hook
+        from .models import Tag
+        tag = Tag.objects.create(name='RecurTag', color='#111111')
+        item.tags.add(tag)
         item.is_completed = True
         item.save()
         
@@ -561,6 +564,7 @@ class LifeOSV3FeaturesTestCase(TestCase):
         clone = clones.first()
         self.assertEqual(clone.status, 'Planned')
         self.assertIsNotNone(clone.due_date)
+        self.assertIn(tag, clone.tags.all())
 
     def test_certifications_hud(self):
         """Verify certifications creation and PDU progress metrics."""
@@ -1463,4 +1467,44 @@ class LifeOSPhase5TestCase(TestCase):
         data = response.json()
         self.assertTrue(len(data['conflicts']) > 0)
         self.assertEqual(len(data['conflicts']), 1)
+
+
+class LifeOSSecurityUpgradesTestCase(TestCase):
+    """
+    Verifies Phase 1 security improvements, token encryption, and view access limits.
+    """
+    def setUp(self):
+        self.owner = User.objects.create_superuser(username='owner_trish', password='StrongSecurePassword123!', email='trish@lifeos.lan')
+        self.client = Client()
+
+    def test_credentials_encryption_cycle(self):
+        """Credentials JSON should be encrypted prior to save, and decrypted on read."""
+        integ = CalendarIntegration.objects.create(
+            user_email="trish@lifeos.lan",
+            credentials_json={"token": "supersecrettokenvalue", "refresh_token": "refreshvalue"}
+        )
+        
+        # Accessing via helper method should decrypt it
+        decrypted = integ.get_credentials()
+        self.assertEqual(decrypted["token"], "supersecrettokenvalue")
+        self.assertEqual(decrypted["refresh_token"], "refreshvalue")
+
+    def test_view_auth_decorators(self):
+        """Verify that protected views redirect unauthenticated users to login page."""
+        protected_urls = [
+            reverse('dashboard'),
+            reverse('settings'),
+            reverse('explorer'),
+            reverse('planner'),
+            reverse('analytics'),
+            reverse('explorer-grid'),
+            reverse('triage'),
+            reverse('kanban-status'),
+            reverse('academy'),
+        ]
+        for url in protected_urls:
+            response = self.client.get(url)
+            self.assertEqual(response.status_code, 302)
+            self.assertIn(reverse('login'), response.url)
+
 

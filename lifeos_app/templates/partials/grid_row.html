@@ -58,7 +58,7 @@
     </div>
 
     <!-- Type -->
-    <div class="w-[6%]">
+    <div class="w-[6%] col-type hidden md:block">
         {% if is_container %}
             <select name="value"
                     hx-post="{% url 'explorer-grid-save-field' %}" 
@@ -85,7 +85,7 @@
     </div>
 
     <!-- Status -->
-    <div class="w-[9%]">
+    <div class="w-[9%] col-status">
         {% if is_container %}
             <span class="text-[10px] text-gray-600 italic px-1">N/A (Container)</span>
         {% else %}
@@ -105,7 +105,7 @@
     </div>
 
     <!-- Priority -->
-    <div class="w-[8%]">
+    <div class="w-[8%] col-priority">
         <select name="value"
                 hx-post="{% url 'explorer-grid-save-field' %}" 
                 hx-vals='{"model_type": "{% if is_container %}container{% else %}item{% endif %}", "model_id": "{% if is_container %}{{ child.id }}{% else %}{{ item.id }}{% endif %}", "field": "priority"}' 
@@ -121,7 +121,7 @@
     </div>
 
     <!-- Urgency -->
-    <div class="w-[8%]">
+    <div class="w-[8%] col-urgency hidden md:block">
         <select name="value"
                 hx-post="{% url 'explorer-grid-save-field' %}" 
                 hx-vals='{"model_type": "{% if is_container %}container{% else %}item{% endif %}", "model_id": "{% if is_container %}{{ child.id }}{% else %}{{ item.id }}{% endif %}", "field": "urgency"}' 
@@ -137,7 +137,7 @@
     </div>
 
     <!-- Domain -->
-    <div class="w-[10%]">
+    <div class="w-[10%] col-domain hidden md:block">
         <select name="value"
                 hx-post="{% url 'explorer-grid-save-field' %}" 
                 hx-vals='{"model_type": "{% if is_container %}container{% else %}item{% endif %}", "model_id": "{% if is_container %}{{ child.id }}{% else %}{{ item.id }}{% endif %}", "field": "domain"}' 

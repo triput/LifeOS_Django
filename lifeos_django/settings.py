@@ -16,8 +16,21 @@ load_dotenv(os.path.join(BASE_DIR, '.env'))
 
 # Security: Keep this safe!
 SECRET_KEY = os.environ["SECRET_KEY"]
-DEBUG = os.environ.get("DEBUG", "True") == "True"
-ALLOWED_HOSTS = ["localhost", "127.0.0.1"]
+DEBUG = os.environ.get("DEBUG", "False") == "True"
+ALLOWED_HOSTS = os.environ.get("ALLOWED_HOSTS", "localhost,127.0.0.1").split(",")
+CSRF_TRUSTED_ORIGINS = os.environ.get("CSRF_TRUSTED_ORIGINS", "").split(",") if os.environ.get("CSRF_TRUSTED_ORIGINS") else []
+
+
+# Security headers and cookie hardening
+SESSION_COOKIE_HTTPONLY = True
+SESSION_COOKIE_SECURE = not DEBUG
+SESSION_COOKIE_SAMESITE = 'Lax'
+CSRF_COOKIE_HTTPONLY = True
+CSRF_COOKIE_SECURE = not DEBUG
+SECURE_BROWSER_XSS_FILTER = True
+SECURE_CONTENT_TYPE_NOSNIFF = True
+X_FRAME_OPTIONS = 'DENY'
+
 
 INSTALLED_APPS = [
     "django.contrib.admin",

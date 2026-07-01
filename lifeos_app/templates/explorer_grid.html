@@ -16,7 +16,31 @@
             </h2>
             <p class="text-sm text-gray-400 mt-1.5">A spreadsheet view of your entire backlog hierarchy. Expand categories, edit fields inline, and add tasks instantly.</p>
         </div>
-        <div class="flex items-center space-x-4">
+        <div class="flex items-center space-x-3 flex-wrap gap-y-2">
+            <!-- Column Visibility Toggle Dropdown -->
+            <div class="relative" id="column-visibility-wrapper">
+                <button type="button" 
+                        onclick="toggleColumnVisibilityPanel()" 
+                        class="px-4 py-2 bg-gray-900 hover:bg-gray-800 text-gray-300 rounded-lg text-sm font-semibold border border-gray-800 transition-colors flex items-center space-x-2 select-none">
+                    <span>👁️</span> <span>Columns</span>
+                </button>
+                <div id="column-visibility-panel" class="absolute right-0 mt-1 w-44 bg-[#0D111D] border border-gray-800 rounded-xl shadow-2xl z-50 p-3 space-y-2 hidden">
+                    <h5 class="text-[10px] font-bold text-gray-400 uppercase tracking-wider border-b border-gray-850 pb-1 mb-2">Show Columns</h5>
+                    <label class="flex items-center space-x-2 cursor-pointer text-xs text-gray-300">
+                        <input type="checkbox" id="toggle-col-type" checked onclick="setColVisibility('type', this.checked)" class="rounded bg-gray-950 border-gray-800 text-[#9966CC] focus:ring-[#9966CC] h-3.5 w-3.5">
+                        <span>Type</span>
+                    </label>
+                    <label class="flex items-center space-x-2 cursor-pointer text-xs text-gray-300">
+                        <input type="checkbox" id="toggle-col-urgency" checked onclick="setColVisibility('urgency', this.checked)" class="rounded bg-gray-950 border-gray-800 text-[#9966CC] focus:ring-[#9966CC] h-3.5 w-3.5">
+                        <span>Urgency</span>
+                    </label>
+                    <label class="flex items-center space-x-2 cursor-pointer text-xs text-gray-300">
+                        <input type="checkbox" id="toggle-col-domain" checked onclick="setColVisibility('domain', this.checked)" class="rounded bg-gray-950 border-gray-800 text-[#9966CC] focus:ring-[#9966CC] h-3.5 w-3.5">
+                        <span>Domain</span>
+                    </label>
+                </div>
+            </div>
+
             <a href="?unprepared_only={% if unprepared_only %}false{% else %}true{% endif %}" 
                class="px-4 py-2 {% if unprepared_only %}bg-[#9966CC]/15 border-[#9966CC]/40 text-[#9966CC]{% else %}bg-gray-900 border-gray-800 text-gray-300{% endif %} hover:bg-gray-800 rounded-lg text-sm font-semibold border transition-all flex items-center space-x-2">
                 <span>🔍</span> <span>{% if unprepared_only %}Showing Unprepared Items{% else %}Grooming Mode (Unprepared Only){% endif %}</span>
@@ -36,13 +60,13 @@
                 <input type="checkbox" id="master-select-all" onclick="toggleSelectAll(this)" class="rounded bg-gray-950 border-gray-800 text-[#9966CC] focus:ring-[#9966CC] h-3.5 w-3.5 mr-2.5">
                 <span>Hierarchy Node (Title)</span>
             </div>
-            <div class="w-[6%]">Type</div>
-            <div class="w-[9%]">Status</div>
-            <div class="w-[8%]">Priority</div>
-            <div class="w-[8%]">Urgency</div>
-            <div class="w-[10%]">Domain</div>
-            <div class="w-[10%]">Tags</div>
-            <div class="w-[14%]">Dates</div>
+            <div class="w-[6%] col-type hidden md:block">Type</div>
+            <div class="w-[9%] col-status">Status</div>
+            <div class="w-[8%] col-priority">Priority</div>
+            <div class="w-[8%] col-urgency hidden md:block">Urgency</div>
+            <div class="w-[10%] col-domain hidden md:block">Domain</div>
+            <div class="w-[10%] col-tags">Tags</div>
+            <div class="w-[14%] col-dates">Dates</div>
             <div class="w-[6%] text-right">Actions</div>
         </div>
 
@@ -152,8 +176,29 @@
         }
     }
 
-    // Close tag dropdowns when clicking outside
+    // Column visibility toggle overrides for mobile
+    function toggleColumnVisibilityPanel() {
+        const panel = document.getElementById('column-visibility-panel');
+        if (panel) panel.classList.toggle('hidden');
+    }
+
+    function setColVisibility(colName, isVisible) {
+        const elements = document.querySelectorAll(`.col-${colName}`);
+        elements.forEach(el => {
+            if (isVisible) {
+                el.classList.remove('hidden', 'md:block');
+            } else {
+                el.classList.add('hidden', 'md:block');
+            }
+        });
+    }
+
+    // Close panels when clicking outside
     window.addEventListener('click', function(e) {
+        if (!e.target.closest("#column-visibility-wrapper")) {
+            const panel = document.getElementById('column-visibility-panel');
+            if (panel) panel.classList.add('hidden');
+        }
         if (!e.target.closest("[id^='tag-dropdown-wrapper-']")) {
             document.querySelectorAll("[id^='tag-dropdown-panel-']").forEach(panel => {
                 panel.classList.add('hidden');
@@ -220,6 +265,15 @@
     document.body.addEventListener('change', function(e) {
         if (e.target.classList.contains('grid-row-checkbox')) {
             updateBulkActionBar();
+        }
+    });
+
+    // Auto-uncheck column selectors if page starts on small viewports
+    window.addEventListener('DOMContentLoaded', () => {
+        if (window.innerWidth < 768) {
+            document.getElementById('toggle-col-type').checked = false;
+            document.getElementById('toggle-col-urgency').checked = false;
+            document.getElementById('toggle-col-domain').checked = false;
         }
     });
 </script>

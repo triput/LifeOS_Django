@@ -34,6 +34,14 @@ class OpenMeteoAdapter:
         """
         Fetches current temperature and daily sunrise/sunset timings.
         """
+        import sys
+        is_testing = 'test' in sys.argv
+        from django.core.cache import cache
+        cache_key = 'openmeteo_telemetry_cache'
+        cached_val = None if is_testing else cache.get(cache_key)
+        if cached_val:
+            return cached_val
+
         from .models import AppSettings
         settings = AppSettings.get_solo()
         
@@ -68,12 +76,14 @@ class OpenMeteoAdapter:
             sunrise = sunrise_list[0].split("T")[1] if sunrise_list else "N/A"
             sunset = sunset_list[0].split("T")[1] if sunset_list else "N/A"
             
-            return {
+            res = {
                 "temperature": f"{temp}{temp_unit}" if temp is not None else "N/A",
                 "sunrise": sunrise,
                 "sunset": sunset,
                 "status": "online",
             }
+            cache.set(cache_key, res, 300)
+            return res
         except Exception as e:
             logger.error("Failed to query Open-Meteo telemetry: %s", e)
             return {
@@ -95,6 +105,14 @@ class NoaaKpAdapter:
         """
         Fetches the latest recorded planetary Kp index value.
         """
+        import sys
+        is_testing = 'test' in sys.argv
+        from django.core.cache import cache
+        cache_key = 'noaakp_telemetry_cache'
+        cached_val = None if is_testing else cache.get(cache_key)
+        if cached_val:
+            return cached_val
+
         try:
             response = requests.get(self.url, timeout=5)
             response.raise_for_status()
@@ -147,12 +165,14 @@ class NoaaKpAdapter:
                 elif level >= 4.0:
                     status_label = "Unsettled"
                 
-                return {
+                res = {
                     "kp_index": kp if kp is not None else "N/A",
                     "time": time_str,
                     "condition": status_label,
                     "status": "online",
                 }
+                cache.set(cache_key, res, 300)
+                return res
             return {
                 "kp_index": "N/A",
                 "time": "N/A",

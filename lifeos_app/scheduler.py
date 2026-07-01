@@ -62,7 +62,7 @@ def sync_google_calendar_events(force=False):
 
     for integration in integrations:
         try:
-            creds_data = integration.credentials_json
+            creds_data = integration.get_credentials()
             if not creds_data:
                 continue
                 
@@ -77,7 +77,8 @@ def sync_google_calendar_events(force=False):
             
             if creds.expired and creds.refresh_token:
                 creds.refresh(Request())
-                integration.credentials_json['token'] = creds.token
+                creds_data['token'] = creds.token
+                integration.credentials_json = creds_data
                 integration.save(update_fields=['credentials_json'])
                 
             service = build('calendar', 'v3', credentials=creds)
@@ -305,5 +306,10 @@ def generate_schedule_for_date(target_date: datetime.date):
                 
                 # Shrink the available interval by task duration + user configured buffer minutes
                 buffer_td = datetime.timedelta(minutes=settings.scheduler_buffer_minutes)
-                interval['start'] = alloc_end + buffer_td
+                new_start = alloc_end + buffer_td
+                if new_start < interval['end']:
+                    interval['start'] = new_start
+                else:
+                    # Interval is fully consumed, remove it
+                    interval['start'] = interval['end']
                 break # Move to next task

@@ -1,22 +1,23 @@
 # ==============================================================================
-# File: lifeos_django/wsgi.py
-# Description: WSGI config for lifeos_django project
-# Component: Core / WSGI Config
+# File: passenger_wsgi.py
+# Description: WSGI entry point for Phusion Passenger deployment on HostGator
+# Component: Deployment / Server Configuration
 # Version: 1.0 (Gold Master)
 # Created: 2026-06-30
 # Last Update: 2026-06-30
 # ==============================================================================
-"""
-WSGI config for lifeos_django project.
 
-It exposes the WSGI callable as a module-level variable named ``application``.
-
-For more information on this file, see
-https://docs.djangoproject.com/en/6.0/howto/deployment/wsgi/
-"""
-
-import os
 import sys
+import os
+
+# Define the virtual environment python interpreter path
+# IMPORTANT: Update 'your_username' with the actual HostGator SSH/cPanel username.
+INTERP = '/home/your_username/LifeOS_Django/venv/bin/python'
+if sys.executable != INTERP:
+    os.execl(INTERP, INTERP, *sys.argv)
+
+# Application folder path
+sys.path.insert(0, os.path.dirname(__file__))
 
 # Swap standard sqlite3 with pysqlite3-binary if installed
 try:
@@ -57,9 +58,7 @@ try:
 except ImportError:
     pass
 
+os.environ['DJANGO_SETTINGS_MODULE'] = 'lifeos_django.settings'
+
 from django.core.wsgi import get_wsgi_application
-
-os.environ.setdefault("DJANGO_SETTINGS_MODULE", "lifeos_django.settings")
-
 application = get_wsgi_application()
-

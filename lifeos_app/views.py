@@ -62,6 +62,7 @@ def logout_view(request):
     return redirect('login')
 
 
+@login_required
 def dashboard_view(request):
     """
     Renders the consolidated workspace dashboard and the Unified Domain Context HUD.
@@ -176,6 +177,7 @@ def dashboard_view(request):
     return render(request, 'dashboard.html', context)
 
 
+@login_required
 def container_detail_view(request, container_id):
     """
     Renders workspace view scoped to a selected WorkspaceContainer.
@@ -207,6 +209,7 @@ def container_detail_view(request, container_id):
     return render(request, 'container_detail.html', context)
 
 
+@login_required
 def task_action_view(request):
     """
     Consolidated focus engine endpoint for ExecutionItem focus actions.
@@ -291,6 +294,7 @@ def toggle_task(request, task_id):
 
 
 # Quick Entry View (FR-QUICK-001)
+@login_required
 def quick_entry_view(request):
     if request.method == 'POST':
         title = request.POST.get('title', '').strip()
@@ -325,11 +329,13 @@ def quick_entry_view(request):
     return redirect('dashboard')
 
 
+@login_required
 def clear_toast_view(request):
     return render(request, 'partials/clear_toast.html')
 
 
 # Inbox Triage View (FR-INBOX-002)
+@login_required
 def triage_view(request):
     from django.db.models import Q
     inbox_items = ExecutionItem.objects.filter(
@@ -374,6 +380,7 @@ def triage_view(request):
     return render(request, 'triage.html', context)
 
 
+@login_required
 def process_triage_view(request, item_id):
     if request.method == 'POST':
         item = get_object_or_404(ExecutionItem, id=item_id)
@@ -441,6 +448,7 @@ def process_triage_view(request, item_id):
     return redirect('triage')
 
 
+@login_required
 def process_container_triage_view(request, container_id):
     if request.method == 'POST':
         container = get_object_or_404(WorkspaceContainer, id=container_id)
@@ -464,12 +472,10 @@ def process_container_triage_view(request, container_id):
             try:
                 dom_cat = DomainCategory.objects.get(name=domain)
                 container.domain = dom_cat
-                container.domain_category = dom_cat.name
             except DomainCategory.DoesNotExist:
                 dom_cat = DomainCategory.objects.filter(name=domain).first()
                 if dom_cat:
                     container.domain = dom_cat
-                    container.domain_category = dom_cat.name
                     
         if para:
             container.para_category = para
@@ -495,6 +501,7 @@ def process_container_triage_view(request, container_id):
 
 
 # Settings View & Diagnostics (FR-SETTINGS-001 / FR-SETTINGS-002)
+@login_required
 def settings_view(request):
     settings = AppSettings.get_solo()
     if request.method == 'POST':
@@ -629,6 +636,8 @@ def settings_view(request):
     return render(request, 'settings.html', context)
 
 
+@login_required
+@require_POST
 def domain_add_view(request):
     if request.method == 'POST':
         name = request.POST.get('name', '').strip()
@@ -656,6 +665,8 @@ def domain_delete_view(request, domain_id):
     return redirect('settings')
 
 
+@login_required
+@require_POST
 def calendar_add_view(request):
     if request.method == 'POST':
         cal_id = request.POST.get('calendar_id', '').strip()
@@ -791,13 +802,29 @@ def tag_retag_view(request, tag_id):
     return redirect('tags-manager')
 
 
+@login_required
 def backup_view(request):
     if request.method == 'POST':
         try:
+            from .models import DomainCategory, Tag, Certification, RecurringConfig, NotionIntegration, GoogleCalendar, CalendarIntegration, TimeAvailabilityBlock, AppSettings
+            
             containers = WorkspaceContainer.objects.all()
             items = ExecutionItem.objects.all()
+            domains = DomainCategory.objects.all()
+            tags = Tag.objects.all()
+            certs = Certification.objects.all()
+            recurrings = RecurringConfig.objects.all()
+            notions = NotionIntegration.objects.all()
+            calendars = GoogleCalendar.objects.all()
+            integrations = CalendarIntegration.objects.all()
+            blocks = TimeAvailabilityBlock.objects.all()
+            settings_objs = AppSettings.objects.all()
             
-            combined_data = list(containers) + list(items)
+            combined_data = (
+                list(settings_objs) + list(domains) + list(tags) + list(certs) +
+                list(containers) + list(items) + list(recurrings) + list(notions) +
+                list(calendars) + list(integrations) + list(blocks)
+            )
             serialized = serializers.serialize('json', combined_data, indent=2)
             
             backup_dir = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), 'backup')
@@ -824,6 +851,7 @@ def backup_view(request):
 
 
 # Workspace Explorer (FR-EXPLORER-001)
+@login_required
 def explorer_view(request):
     root_containers = WorkspaceContainer.objects.filter(
         parent=None,
@@ -874,6 +902,7 @@ def explorer_view(request):
     return render(request, 'explorer.html', context)
 
 
+@login_required
 def explorer_children_view(request):
     parent_type = request.GET.get('parent_type')
     parent_id = request.GET.get('parent_id')
@@ -945,6 +974,8 @@ def explorer_children_view(request):
     return HttpResponse("Invalid query", status=400)
 
 
+@login_required
+@require_POST
 def explorer_add_child_view(request):
     if request.method == 'POST':
         title = request.POST.get('title', '').strip()
@@ -989,6 +1020,8 @@ def explorer_add_child_view(request):
     return redirect('explorer')
 
 
+@login_required
+@require_POST
 def explorer_move_view(request):
     if request.method == 'POST':
         node_type = request.POST.get('node_type')
@@ -1037,19 +1070,8 @@ def explorer_move_view(request):
 
 
 def parse_datetime_input_tz(val):
-    if not val:
-        return None
-    from django.utils.dateparse import parse_datetime, parse_date
-    from django.utils import timezone
-    import datetime
-    dt = parse_datetime(val)
-    if not dt:
-        d = parse_date(val)
-        if d:
-            dt = datetime.datetime.combine(d, datetime.time.min)
-    if dt and timezone.is_naive(dt):
-        return timezone.make_aware(dt)
-    return dt
+    from .context_processors import parse_datetime_input
+    return parse_datetime_input(val)
 
 
 def _cascade_container_dates(container, start, end, due, respect_existing=False):
@@ -1096,6 +1118,7 @@ def _cascade_item_dates(item, start, end, due, respect_existing=False):
         _cascade_item_dates(sub, start, end, due, respect_existing)
 
 
+@login_required
 def explorer_edit_view(request, node_type, node_id):
     if node_type == 'container':
         container = get_object_or_404(WorkspaceContainer, id=node_id)
@@ -1307,6 +1330,7 @@ def explorer_edit_view(request, node_type, node_id):
     return HttpResponse("Invalid node type", status=400)
 
 
+@login_required
 def explorer_bulk_action_view(request):
     if request.method == 'POST':
         action = request.POST.get('action')
@@ -1330,6 +1354,7 @@ def explorer_bulk_action_view(request):
 
 
 # Interactive Analytics Dashboard (FR-ANALYTICS-001)
+@login_required
 def analytics_view(request):
     domain_time = ExecutionItem.objects.filter(
         is_deleted=False
@@ -1363,6 +1388,7 @@ def analytics_view(request):
 
 
 # Dynamic Chart Drilldown (FR-ANALYTICS-002)
+@login_required
 def analytics_drilldown_view(request):
     category = request.GET.get('category')
     chart_type = request.GET.get('chart_type')
@@ -1394,6 +1420,7 @@ def toggle_pin_view(request, item_id):
     return redirect(next_url)
 
 
+@login_required
 def academy_view(request):
     academy_domains = DomainCategory.objects.filter(is_academy=True)
     
@@ -1410,12 +1437,13 @@ def academy_view(request):
         is_archived=False
     ).order_by('due_date', 'created_at')
     
-    certifications = Certification.objects.all().order_by('renewal_date')
+    certifications = Certification.objects.annotate(
+        total_container_credits=Sum('containers__credits_earned')
+    ).order_by('renewal_date')
     
     for cert in certifications:
-        containers = WorkspaceContainer.objects.filter(certification=cert)
-        total_container_credits = sum(c.credits_earned for c in containers)
-        cert.total_earned = cert.pdus_earned + total_container_credits
+        total_credits = cert.total_container_credits or 0
+        cert.total_earned = cert.pdus_earned + total_credits
         if cert.pdus_required > 0:
             cert.progress_percent = min(100, int((cert.total_earned / float(cert.pdus_required)) * 100))
         else:
@@ -1430,6 +1458,8 @@ def academy_view(request):
     return render(request, 'academy.html', context)
 
 
+@login_required
+@require_POST
 def certification_add_view(request):
     if request.method == 'POST':
         title = request.POST.get('title', '').strip()
@@ -1472,6 +1502,7 @@ def certification_delete_view(request, cert_id):
 # V4.0 Interactive Planner Dashboard
 # ==============================================================================
 
+@login_required
 def planner_view(request):
     """
     Renders the V4 Planner Grid featuring FullCalendar and NL input form.
@@ -1479,12 +1510,7 @@ def planner_view(request):
     from django.urls import reverse
     settings = AppSettings.get_solo()
     
-    # Trigger a throttled sync of Google Calendar events
-    from .scheduler import sync_google_calendar_events
-    try:
-        sync_google_calendar_events()
-    except Exception:
-        pass
+    # Removed synchronous Google Calendar sync from views to resolve latency issues (PERF-06)
         
     from .models import ScheduledTaskAllocation, GoogleCalendarEvent, ExecutionItem
     allocations = ScheduledTaskAllocation.objects.select_related(
@@ -1507,19 +1533,19 @@ def planner_view(request):
             user_tz = timezone.get_current_timezone()
 
     import datetime
+    from django.db.models import Exists, OuterRef
+    alloc_sub = ScheduledTaskAllocation.objects.filter(execution_item=OuterRef('pk'))
     all_uncompleted = ExecutionItem.objects.filter(
         is_completed=False,
         is_deleted=False,
         start_date__isnull=False
-    ).select_related('domain')
+    ).annotate(has_alloc=Exists(alloc_sub)).filter(has_alloc=False).select_related('domain')
     
     unallocated_items = []
     for item in all_uncompleted:
-        has_alloc = ScheduledTaskAllocation.objects.filter(execution_item=item).exists()
-        if not has_alloc:
-            local_start = item.start_date.astimezone(user_tz)
-            if local_start.hour == 0 and local_start.minute == 0:
-                unallocated_items.append(item)
+        local_start = item.start_date.astimezone(user_tz)
+        if local_start.hour == 0 and local_start.minute == 0:
+            unallocated_items.append(item)
                 
     import json
     # Serialize unallocated grooming items
@@ -1571,6 +1597,7 @@ def planner_view(request):
     return render(request, 'planner.html', context)
 
 
+@login_required
 def planner_parse_nl_view(request):
     """
     HTMX endpoint for taking natural language, parsing via SLM, and re-running the solver.
@@ -2487,7 +2514,9 @@ def calendar_auth_view(request):
     from google_auth_oauthlib.flow import Flow
     
     # Allow insecure HTTP for local dev OAuth2 flow
-    os.environ['OAUTHLIB_INSECURE_TRANSPORT'] = '1'
+    from django.conf import settings
+    if settings.DEBUG:
+        os.environ['OAUTHLIB_INSECURE_TRANSPORT'] = '1'
     
     # Needs to match the Authorized redirect URI in Google Cloud Console
     redirect_uri = request.build_absolute_uri('/settings/calendar/oauth2callback/')
@@ -2534,7 +2563,9 @@ def calendar_oauth2callback_view(request):
     from .models import CalendarIntegration
     
     # Allow insecure HTTP for local dev OAuth2 flow
-    os.environ['OAUTHLIB_INSECURE_TRANSPORT'] = '1'
+    from django.conf import settings
+    if settings.DEBUG:
+        os.environ['OAUTHLIB_INSECURE_TRANSPORT'] = '1'
     
     state = request.session.get('state')
     if not state:
