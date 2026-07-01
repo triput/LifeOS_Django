@@ -4,4 +4,6 @@ dj-database-url>=2.1
 python-dotenv>=1.0
 requests>=2.31
 argon2-cffi>=23.1
-pysqlite3-binary
+gunicorn
+psycopg2-binary
+
