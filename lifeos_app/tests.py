@@ -4,7 +4,7 @@
 # Component: Core / Automated Testing
 # Version: 1.0 (Gold Master)
 # Created: 2026-06-26
-# Last Update: 2026-06-30
+# Last Update: 2026-07-01
 # ==============================================================================
 """Automated verification suite for the LifeOS application.
 
@@ -1554,5 +1554,30 @@ class LifeOSSecurityUpgradesTestCase(TestCase):
             response = self.client.get(url)
             self.assertEqual(response.status_code, 302)
             self.assertIn(reverse('login'), response.url)
+
+
+from django.core.management import call_command
+import io
+
+class LifeOSClearDBCommandTestCase(TestCase):
+    """
+    Verifies that the clear_db management command successfully wipes user data.
+    """
+    def test_clear_db_command_success(self):
+        # Create a tag and workspace container to verify they get deleted
+        Tag.objects.create(name="TestTag", color="#FFFFFF")
+        WorkspaceContainer.objects.create(title="Test Epic", container_type="Epic")
+        
+        self.assertEqual(Tag.objects.count(), 1)
+        self.assertEqual(WorkspaceContainer.objects.count(), 1)
+        
+        out = io.StringIO()
+        call_command('clear_db', force=True, stdout=out)
+        
+        # Verify that all operational tables are now empty
+        self.assertEqual(Tag.objects.count(), 0)
+        self.assertEqual(WorkspaceContainer.objects.count(), 0)
+        self.assertIn("Database successfully cleared of operational data", out.getvalue())
+
 
 
