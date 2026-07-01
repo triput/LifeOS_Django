@@ -6,4 +6,6 @@ requests>=2.31
 argon2-cffi>=23.1
 gunicorn
 psycopg2-binary
-
+google-auth>=2.20.0
+google-auth-oauthlib>=1.0.0
+google-api-python-client>=2.90.0
