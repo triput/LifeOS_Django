@@ -48,7 +48,7 @@
 
         <!-- Inline Title Editor -->
         <input type="text" 
-               name="value" 
+               name="{% if is_container %}title_container_{{ child.id }}{% else %}title_item_{{ item.id }}{% endif %}" 
                value="{% if is_container %}{{ child.title }}{% else %}{{ item.title }}{% endif %}" 
                hx-post="{% url 'explorer-grid-save-field' %}" 
                hx-vals='{"model_type": "{% if is_container %}container{% else %}item{% endif %}", "model_id": "{% if is_container %}{{ child.id }}{% else %}{{ item.id }}{% endif %}", "field": "title"}' 
@@ -61,7 +61,7 @@
     <!-- Type -->
     <div class="w-[6%] col-type hidden md:block">
         {% if is_container %}
-            <select name="value"
+            <select name="container_type_container_{{ child.id }}"
                     hx-post="{% url 'explorer-grid-save-field' %}" 
                     hx-vals='{"model_type": "container", "model_id": "{{ child.id }}", "field": "container_type"}' 
                     hx-swap="none"
@@ -74,7 +74,7 @@
                 <option value="Module" {% if child.container_type == 'Module' %}selected{% endif %}>Module</option>
             </select>
         {% else %}
-            <select name="value"
+            <select name="item_type_item_{{ item.id }}"
                     hx-post="{% url 'explorer-grid-save-field' %}" 
                     hx-vals='{"model_type": "item", "model_id": "{{ item.id }}", "field": "item_type"}' 
                     hx-swap="none"
@@ -92,7 +92,7 @@
         {% if is_container %}
             <span class="text-[10px] text-gray-600 italic px-1">N/A (Container)</span>
         {% else %}
-            <select name="value"
+            <select name="status_item_{{ item.id }}"
                     hx-post="{% url 'explorer-grid-save-field' %}" 
                     hx-vals='{"model_type": "item", "model_id": "{{ item.id }}", "field": "status"}' 
                     hx-swap="none"
@@ -110,7 +110,7 @@
 
     <!-- Priority -->
     <div class="w-[8%] col-priority">
-        <select name="value"
+        <select name="{% if is_container %}priority_container_{{ child.id }}{% else %}priority_item_{{ item.id }}{% endif %}"
                 hx-post="{% url 'explorer-grid-save-field' %}" 
                 hx-vals='{"model_type": "{% if is_container %}container{% else %}item{% endif %}", "model_id": "{% if is_container %}{{ child.id }}{% else %}{{ item.id }}{% endif %}", "field": "priority"}' 
                 hx-swap="none"
@@ -127,7 +127,7 @@
 
     <!-- Urgency -->
     <div class="w-[8%] col-urgency hidden md:block">
-        <select name="value"
+        <select name="{% if is_container %}urgency_container_{{ child.id }}{% else %}urgency_item_{{ item.id }}{% endif %}"
                 hx-post="{% url 'explorer-grid-save-field' %}" 
                 hx-vals='{"model_type": "{% if is_container %}container{% else %}item{% endif %}", "model_id": "{% if is_container %}{{ child.id }}{% else %}{{ item.id }}{% endif %}", "field": "urgency"}' 
                 hx-swap="none"
@@ -144,7 +144,7 @@
 
     <!-- Domain -->
     <div class="w-[10%] col-domain hidden md:block">
-        <select name="value"
+        <select name="{% if is_container %}domain_container_{{ child.id }}{% else %}domain_item_{{ item.id }}{% endif %}"
                 hx-post="{% url 'explorer-grid-save-field' %}" 
                 hx-vals='{"model_type": "{% if is_container %}container{% else %}item{% endif %}", "model_id": "{% if is_container %}{{ child.id }}{% else %}{{ item.id }}{% endif %}", "field": "domain"}' 
                 hx-swap="none"
@@ -209,7 +209,7 @@
                 {% for t in all_tags %}
                     <label class="flex items-center space-x-2 p-1 hover:bg-gray-800/20 rounded cursor-pointer text-[10px]">
                         <input type="checkbox" 
-                               name="value" 
+                               name="tags_{% if is_container %}container_{{ child.id }}{% else %}item_{{ item.id }}{% endif %}" 
                                value="{{ t.id }}"
                                {% if is_container %}{% if t in child.tags.all %}checked{% endif %}{% else %}{% if t in item.tags.all %}checked{% endif %}{% endif %}
                                class="rounded text-[#9966CC] focus:ring-[#9966CC] bg-gray-950 border-gray-800 h-3.5 w-3.5">
@@ -227,7 +227,7 @@
         {% else %}
             <div class="flex items-center space-x-1">
                 <input type="date" 
-                       name="value" 
+                       name="start_date_item_{{ item.id }}" 
                        value="{{ item.start_date|date:'Y-m-d' }}" 
                        hx-post="{% url 'explorer-grid-save-field' %}" 
                        hx-vals='{"model_type": "item", "model_id": "{{ item.id }}", "field": "start_date"}' 
@@ -236,7 +236,7 @@
                        class="bg-[#090D16] text-[9px] text-gray-300 border border-gray-800 rounded p-1 w-full focus:outline-none">
                 <span class="text-gray-600 text-xs">→</span>
                 <input type="date" 
-                       name="value" 
+                       name="due_date_item_{{ item.id }}" 
                        value="{{ item.due_date|date:'Y-m-d' }}" 
                        hx-post="{% url 'explorer-grid-save-field' %}" 
                        hx-vals='{"model_type": "item", "model_id": "{{ item.id }}", "field": "due_date"}' 

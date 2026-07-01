@@ -41,6 +41,13 @@
                 </div>
             </div>
 
+            <button type="submit" 
+                    form="grid-bulk-form" 
+                    formaction="{% url 'explorer-grid-bulk-save' %}"
+                    class="px-4 py-2 bg-emerald-500 hover:bg-emerald-400 text-gray-900 rounded-lg text-sm font-bold shadow-lg transition-all flex items-center space-x-2">
+                <span>💾</span> <span>Save Now</span>
+            </button>
+
             <a href="?unprepared_only={% if unprepared_only %}false{% else %}true{% endif %}" 
                class="px-4 py-2 {% if unprepared_only %}bg-[#9966CC]/15 border-[#9966CC]/40 text-[#9966CC]{% else %}bg-gray-900 border-gray-800 text-gray-300{% endif %} hover:bg-gray-800 rounded-lg text-sm font-semibold border transition-all flex items-center space-x-2">
                 <span>🔍</span> <span>{% if unprepared_only %}Showing Unprepared Items{% else %}Grooming Mode (Unprepared Only){% endif %}</span>

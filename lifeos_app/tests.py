@@ -955,22 +955,24 @@ class LifeOSGridEditorTestCase(TestCase):
         self.assertContains(response, "Grid Task")
 
     def test_grid_editor_save_field_container(self):
+        container_key = f"title_container_{self.container.id}"
         response = self.client.post(reverse('explorer-grid-save-field'), {
             'model_type': 'container',
             'model_id': self.container.id,
             'field': 'title',
-            'value': 'Updated Grid Project Title'
+            container_key: 'Updated Grid Project Title'
         })
         self.assertEqual(response.status_code, 200)
         self.container.refresh_from_db()
         self.assertEqual(self.container.title, 'Updated Grid Project Title')
 
     def test_grid_editor_save_field_item(self):
+        item_key = f"priority_item_{self.task.id}"
         response = self.client.post(reverse('explorer-grid-save-field'), {
             'model_type': 'item',
             'model_id': self.task.id,
             'field': 'priority',
-            'value': 'Critical'
+            item_key: 'Critical'
         })
         self.assertEqual(response.status_code, 200)
         self.task.refresh_from_db()
@@ -1004,11 +1006,12 @@ class LifeOSGridEditorTestCase(TestCase):
         tag1 = Tag.objects.create(name="Tag 1", color="#FF0000")
         tag2 = Tag.objects.create(name="Tag 2", color="#00FF00")
         
+        tags_key = f"tags_item_{self.task.id}"
         response = self.client.post(reverse('explorer-grid-save-field'), {
             'model_type': 'item',
             'model_id': self.task.id,
             'field': 'tags',
-            'value': [tag1.id, tag2.id]
+            tags_key: [tag1.id, tag2.id]
         })
         self.assertEqual(response.status_code, 200)
         self.task.refresh_from_db()
@@ -1027,6 +1030,27 @@ class LifeOSGridEditorTestCase(TestCase):
         tag = Tag.objects.get(name="Brand New Tag")
         self.task.refresh_from_db()
         self.assertIn(tag, self.task.tags.all())
+
+    def test_grid_editor_bulk_save(self):
+        tag1 = Tag.objects.create(name="Bulk Tag", color="#FFBF00")
+        
+        response = self.client.post(reverse('explorer-grid-bulk-save'), {
+            f"title_container_{self.container.id}": "Bulk Saved Project",
+            f"priority_container_{self.container.id}": "High",
+            f"title_item_{self.task.id}": "Bulk Saved Task",
+            f"status_item_{self.task.id}": "In Progress",
+            f"tags_item_{self.task.id}": [tag1.id]
+        })
+        self.assertEqual(response.status_code, 302)
+        
+        self.container.refresh_from_db()
+        self.assertEqual(self.container.title, "Bulk Saved Project")
+        self.assertEqual(self.container.priority, "High")
+        
+        self.task.refresh_from_db()
+        self.assertEqual(self.task.title, "Bulk Saved Task")
+        self.assertEqual(self.task.status, "In Progress")
+        self.assertIn(tag1, self.task.tags.all())
 
     def test_tag_crud_operations(self):
         # 1. Add tag

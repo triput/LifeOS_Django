@@ -4,7 +4,7 @@
 # Component: Core / URL Configuration
 # Version: 1.0 (Gold Master)
 # Created: 2026-06-26
-# Last Update: 2026-06-30
+# Last Update: 2026-07-01
 # ==============================================================================
 from django.urls import path
 from . import views
@@ -57,6 +57,7 @@ urlpatterns = [
     path('explorer/grid/create-tag/', views.explorer_grid_create_tag_view, name='explorer-grid-create-tag'),
     path('explorer/grid/modal/<str:model_type>/<int:model_id>/', views.explorer_grid_modal_view, name='explorer-grid-modal'),
     path('explorer/grid/bulk-action/', views.explorer_grid_bulk_action_view, name='explorer-grid-bulk-action'),
+    path('explorer/grid/bulk-save/', views.explorer_grid_bulk_save_view, name='explorer-grid-bulk-save'),
     
     path('analytics/', views.analytics_view, name='analytics'),
     path('analytics/drilldown/', views.analytics_drilldown_view, name='analytics-drilldown'),

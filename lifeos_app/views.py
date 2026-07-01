@@ -1841,11 +1841,12 @@ def explorer_grid_save_field_view(request):
     model_type = request.POST.get('model_type') # 'container' or 'item'
     model_id = request.POST.get('model_id')
     field = request.POST.get('field')
-    value = request.POST.get('value', '').strip()
     
     if not model_type or not model_id or not field:
         return HttpResponse("Missing fields", status=400)
         
+    key = f"{field}_{model_type}_{model_id}"
+    
     if model_type == 'container':
         obj = get_object_or_404(WorkspaceContainer, id=model_id)
     elif model_type == 'item':
@@ -1854,6 +1855,11 @@ def explorer_grid_save_field_view(request):
         return HttpResponse("Invalid model type", status=400)
         
     try:
+        if field == 'tags':
+            tag_ids = request.POST.getlist(key)
+        else:
+            value = request.POST.get(key, '').strip()
+            
         if field == 'title':
             if not value:
                 return HttpResponse("Title cannot be empty", status=400)
@@ -1878,7 +1884,6 @@ def explorer_grid_save_field_view(request):
         elif field == 'due_date':
             obj.due_date = value if value else None
         elif field == 'tags':
-            tag_ids = request.POST.getlist('value')
             tag_ids = [tid for tid in tag_ids if tid.strip() and tid != 'None' and tid != '']
             if not tag_ids:
                 obj.tags.clear()
@@ -2387,6 +2392,98 @@ def explorer_grid_bulk_action_view(request):
     response = HttpResponse()
     response['HX-Refresh'] = 'true'
     return response
+
+
+@login_required
+def explorer_grid_bulk_save_view(request):
+    """
+    Handles bulk saving for all dynamically-named fields in the backlog grid layout.
+    """
+    if request.method != 'POST':
+        return HttpResponseNotAllowed(['POST'])
+        
+    updates = {}
+    tag_updates = {}
+    
+    for key in request.POST:
+        # Expected dynamic key format: {field}_{model_type}_{model_id}
+        parts = key.rsplit('_', 2)
+        if len(parts) == 3:
+            field, model_type, model_id_str = parts
+            if model_type in ('container', 'item') and model_id_str.isdigit():
+                model_id = int(model_id_str)
+                if field == 'tags':
+                    tag_updates[(model_type, model_id)] = request.POST.getlist(key)
+                else:
+                    val = request.POST.get(key)
+                    if val is not None:
+                        if (model_type, model_id) not in updates:
+                            updates[(model_type, model_id)] = {}
+                        updates[(model_type, model_id)][field] = val.strip()
+                        
+    # Perform database bulk saves
+    for (model_type, model_id), fields in updates.items():
+        if model_type == 'container':
+            try:
+                obj = WorkspaceContainer.objects.get(id=model_id)
+                for f, val in fields.items():
+                    if f == 'title' and val:
+                        obj.title = val
+                    elif f == 'container_type':
+                        obj.container_type = val
+                    elif f == 'priority':
+                        obj.priority = val
+                    elif f == 'urgency':
+                        obj.urgency = val
+                    elif f == 'domain':
+                        obj.domain = None if (val == '' or val == 'None') else DomainCategory.objects.filter(id=val).first()
+                obj.save()
+            except WorkspaceContainer.DoesNotExist:
+                pass
+        elif model_type == 'item':
+            try:
+                obj = ExecutionItem.objects.get(id=model_id)
+                for f, val in fields.items():
+                    if f == 'title' and val:
+                        obj.title = val
+                    elif f == 'item_type':
+                        obj.item_type = val
+                    elif f == 'status':
+                        obj.status = val
+                    elif f == 'priority':
+                        obj.priority = val
+                    elif f == 'urgency':
+                        obj.urgency = val
+                    elif f == 'domain':
+                        obj.domain = None if (val == '' or val == 'None') else DomainCategory.objects.filter(id=val).first()
+                    elif f == 'start_date':
+                        obj.start_date = val if val else None
+                    elif f == 'due_date':
+                        obj.due_date = val if val else None
+                obj.save()
+            except ExecutionItem.DoesNotExist:
+                pass
+                
+    # Update tags in bulk
+    for (model_type, model_id), tag_ids in tag_updates.items():
+        filtered_ids = [tid for tid in tag_ids if tid.strip() and tid != 'None']
+        if model_type == 'container':
+            obj = WorkspaceContainer.objects.filter(id=model_id).first()
+            if obj:
+                if not filtered_ids:
+                    obj.tags.clear()
+                else:
+                    obj.tags.set(Tag.objects.filter(id__in=filtered_ids))
+        elif model_type == 'item':
+            obj = ExecutionItem.objects.filter(id=model_id).first()
+            if obj:
+                if not filtered_ids:
+                    obj.tags.clear()
+                else:
+                    obj.tags.set(Tag.objects.filter(id__in=filtered_ids))
+                    
+    messages.success(request, "All grid changes synced and saved successfully!")
+    return redirect('explorer-grid')
 
 
 # ==============================================================================
