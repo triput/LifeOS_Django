@@ -271,11 +271,19 @@ class WorkspaceContainer(models.Model):
         self.full_clean()
         super().save(*args, **kwargs)
 
-    def get_total_time_spent_seconds(self):
+    def get_total_time_spent_seconds(self, visited=None):
+        if visited is None:
+            visited = set()
+        
+        node_id = ("WorkspaceContainer", self.id)
+        if node_id in visited:
+            return 0
+        visited.add(node_id)
+        
         total = 0
         # 1. Add time of child containers
         for child in self.children.filter(is_archived=False):
-            total += child.get_total_time_spent_seconds()
+            total += child.get_total_time_spent_seconds(visited)
         # 2. Add time of child tasks directly parented to this container
         container_ct = ContentType.objects.get_for_model(WorkspaceContainer)
         items = ExecutionItem.objects.filter(content_type=container_ct, object_id=self.id, is_deleted=False)
@@ -286,7 +294,7 @@ class WorkspaceContainer(models.Model):
         
         # Add subtask recursive time (excluding direct time since we just added it)
         for item in items:
-            total += (item.get_total_time_spent_seconds() - item.time_spent_seconds)
+            total += (item.get_total_time_spent_seconds(visited) - item.time_spent_seconds)
         return total
 
     @property
@@ -554,7 +562,15 @@ class ExecutionItem(models.Model):
             custom_period=recur.custom_period
         )
 
-    def get_total_time_spent_seconds(self):
+    def get_total_time_spent_seconds(self, visited=None):
+        if visited is None:
+            visited = set()
+            
+        node_id = ("ExecutionItem", self.id)
+        if node_id in visited:
+            return 0
+        visited.add(node_id)
+        
         total = self.time_spent_seconds + self.extra_actual_seconds
         item_ct = ContentType.objects.get_for_model(ExecutionItem)
         subitems = ExecutionItem.objects.filter(content_type=item_ct, object_id=self.id, is_deleted=False)
@@ -565,7 +581,7 @@ class ExecutionItem(models.Model):
         
         # Add sub-subtask recursive time
         for sub in subitems:
-            total += (sub.get_total_time_spent_seconds() - sub.time_spent_seconds)
+            total += (sub.get_total_time_spent_seconds(visited) - sub.time_spent_seconds)
         return total
 
     @property
