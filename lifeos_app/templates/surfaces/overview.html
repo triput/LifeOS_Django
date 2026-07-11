@@ -1,0 +1,149 @@
+{% extends "base_shell.html" %}
+{% block title %}LifeOS · Overview{% endblock %}
+{% block canvas %}
+<div class="space-y-4" id="overview-page"
+     data-views-surface="overview"
+     data-views-query="{{ facets.query_string }}">
+  <form id="matrix-bulk-form"
+        hx-post="{% url 'items-bulk' %}"
+        hx-target="#overview-bulk-toast"
+        hx-swap="innerHTML"
+        hx-include="#overview-canvas-inner input[name='item_ids']:checked"
+        class="flex flex-wrap items-center gap-2 rounded-lg border border-cockpit-border bg-cockpit-panel/80 px-3 py-2 text-xs font-mono">
+    {% csrf_token %}
+    <span class="text-cockpit-faint uppercase tracking-widest">Bulk</span>
+    <span id="matrix-selected-count" class="text-cockpit-accent-bright">0 selected</span>
+    <select name="action" class="rounded border border-cockpit-border bg-cockpit-bg px-2 py-1 text-cockpit-muted">
+      <option value="status">Set status</option>
+      <option value="soft_delete">Archive</option>
+    </select>
+    <select name="value" class="rounded border border-cockpit-border bg-cockpit-bg px-2 py-1 text-cockpit-muted">
+      {% for val, label in status_choices %}
+      <option value="{{ val }}">{{ label }}</option>
+      {% endfor %}
+    </select>
+    <button type="submit" class="rounded border border-cockpit-accent/50 px-3 py-1 text-cockpit-accent-bright hover:bg-cockpit-accent/10">Apply to selected</button>
+    <span id="overview-bulk-toast" class="text-orange-400/90"></span>
+  </form>
+
+  <div id="overview-canvas-inner"
+       class="space-y-4"
+       hx-get="{% url 'canvas-overview' %}?{{ facets.query_string }}"
+       hx-trigger="matrix-reload from:body"
+       hx-select="#overview-canvas-inner"
+       hx-swap="outerHTML">
+    <header class="flex flex-col md:flex-row md:items-end md:justify-between gap-3">
+      <div>
+        <h1 class="font-display text-2xl text-cockpit-text tracking-tight">Horizon Overview</h1>
+        <p class="mt-1 text-sm text-cockpit-muted">
+          Active leaves across containers
+          <span class="font-mono text-cockpit-faint">({{ item_count }})</span>
+          — not the Home feed
+        </p>
+      </div>
+      <form method="get" class="flex flex-wrap gap-2 items-end text-sm"
+            hx-get="{% url 'canvas-overview' %}"
+            hx-target="#main-canvas"
+            hx-select="#overview-page"
+            hx-swap="innerHTML"
+            hx-push-url="true">
+        <input type="search" name="q" value="{{ facets.q }}" placeholder="Search…"
+               class="rounded border border-cockpit-border bg-cockpit-bg px-2 py-1.5 text-cockpit-text font-mono text-xs w-36">
+        <select name="status" class="rounded border border-cockpit-border bg-cockpit-bg px-2 py-1.5 text-cockpit-muted text-xs">
+          <option value="">All statuses</option>
+          {% for val, label in status_choices %}
+          <option value="{{ val }}" {% if facets.status == val %}selected{% endif %}>{{ label }}</option>
+          {% endfor %}
+        </select>
+        <select name="domain" class="rounded border border-cockpit-border bg-cockpit-bg px-2 py-1.5 text-cockpit-muted text-xs">
+          <option value="">All domains</option>
+          {% for d in domains %}
+          <option value="{{ d.slug }}" {% if facets.domain == d.slug %}selected{% endif %}>{{ d.name }}</option>
+          {% endfor %}
+        </select>
+        <select name="para" class="rounded border border-cockpit-border bg-cockpit-bg px-2 py-1.5 text-cockpit-muted text-xs">
+          <option value="">All PARA</option>
+          {% for val, label in para_choices %}
+          <option value="{{ val }}" {% if facets.para == val %}selected{% endif %}>{{ label }}</option>
+          {% endfor %}
+        </select>
+        <select name="tag" class="rounded border border-cockpit-border bg-cockpit-bg px-2 py-1.5 text-cockpit-muted text-xs">
+          <option value="">Any tag</option>
+          {% for t in tags %}
+          <option value="{{ t.name }}" {% if facets.tag == t.name %}selected{% endif %}>{{ t.name }}</option>
+          {% endfor %}
+        </select>
+        <select name="group_by" class="rounded border border-cockpit-border bg-cockpit-bg px-2 py-1.5 text-cockpit-muted text-xs">
+          {% for val, label in group_by_choices %}
+          <option value="{{ val }}" {% if facets.group_by == val %}selected{% endif %}>Group: {{ label }}</option>
+          {% endfor %}
+        </select>
+        <label class="flex items-center gap-1 text-xs font-mono text-cockpit-muted">
+          <input type="checkbox" name="show_completed" value="1" {% if facets.show_completed %}checked{% endif %} class="rounded border-cockpit-border">
+          Completed
+        </label>
+        <label class="flex items-center gap-1 text-xs font-mono text-cockpit-muted">
+          <input type="checkbox" name="include_archived" value="1" {% if facets.include_archived %}checked{% endif %} class="rounded border-cockpit-border">
+          Archived homes
+        </label>
+        <button type="submit" class="rounded border border-cockpit-border px-3 py-1.5 text-xs font-mono text-cockpit-accent-bright hover:bg-cockpit-panel">Apply</button>
+      </form>
+    </header>
+    {% include "partials/saved_views_bar.html" %}
+
+    <div class="rounded-xl border border-cockpit-border overflow-x-auto">
+      <div class="grid grid-cols-[2rem_1fr_6rem_3rem_3rem] gap-2 px-3 py-2 text-[10px] font-mono uppercase tracking-widest text-cockpit-faint border-b border-cockpit-border bg-cockpit-panel/80 min-w-[640px]">
+        <span title="Select">☑</span><span>Title</span><span>Status</span><span class="text-center">Pri</span><span class="text-center">Est</span>
+      </div>
+      <div class="divide-y divide-cockpit-border/60" id="overview-canvas">
+        {% for group in groups %}
+          {% if group.label %}
+          <div class="px-3 py-2 text-[10px] font-mono uppercase tracking-widest text-cockpit-accent-bright bg-cockpit-panel/40 border-b border-cockpit-border/40">
+            {{ group.label }}
+            <span class="text-cockpit-faint">({{ group.items|length }})</span>
+          </div>
+          {% endif %}
+          {% for item in group.items %}
+            {% include "partials/matrix_item_row.html" with item=item facets=facets depth=0 %}
+          {% empty %}
+            {% if not group.label %}
+            <p class="p-6 text-sm text-cockpit-faint">No active leaves match these facets.</p>
+            {% endif %}
+          {% endfor %}
+        {% empty %}
+          <p class="p-6 text-sm text-cockpit-faint">No active leaves match these facets.</p>
+        {% endfor %}
+      </div>
+    </div>
+
+    {% if page_obj.paginator.num_pages > 1 %}
+    <nav class="flex flex-wrap items-center justify-between gap-2 text-xs font-mono text-cockpit-muted" aria-label="Overview pagination">
+      <span class="text-cockpit-faint">
+        Page {{ page_obj.number }} / {{ page_obj.paginator.num_pages }}
+        · {{ page_size }} per page
+      </span>
+      <div class="flex gap-2">
+        {% if page_obj.has_previous %}
+        <a href="?{{ prev_qs }}"
+           class="rounded border border-cockpit-border px-3 py-1 hover:text-cockpit-accent-bright"
+           hx-get="{% url 'canvas-overview' %}?{{ prev_qs }}"
+           hx-target="#main-canvas"
+           hx-select="#overview-page"
+           hx-swap="innerHTML"
+           hx-push-url="true">← Prev</a>
+        {% endif %}
+        {% if page_obj.has_next %}
+        <a href="?{{ next_qs }}"
+           class="rounded border border-cockpit-border px-3 py-1 hover:text-cockpit-accent-bright"
+           hx-get="{% url 'canvas-overview' %}?{{ next_qs }}"
+           hx-target="#main-canvas"
+           hx-select="#overview-page"
+           hx-swap="innerHTML"
+           hx-push-url="true">Next →</a>
+        {% endif %}
+      </div>
+    </nav>
+    {% endif %}
+  </div>
+</div>
+{% endblock %}

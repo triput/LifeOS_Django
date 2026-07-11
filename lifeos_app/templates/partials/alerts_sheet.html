@@ -1,0 +1,35 @@
+<div class="fixed inset-0 z-50 flex items-start justify-center pt-[12vh] p-4 bg-black/50 backdrop-blur-sm"
+     onclick="if(event.target===this)this.innerHTML=''">
+  <div class="w-full max-w-lg rounded-xl border border-cockpit-border bg-cockpit-panel shadow-2xl overflow-hidden"
+       onclick="event.stopPropagation()">
+    <div class="flex items-center justify-between px-4 py-3 border-b border-cockpit-border">
+      <h2 class="font-display text-lg text-cockpit-text">Alerts</h2>
+      <button type="button" class="text-cockpit-faint hover:text-cockpit-text text-sm font-mono"
+              onclick="document.getElementById('alerts-overlay').innerHTML=''">✕</button>
+    </div>
+    <ul class="divide-y divide-cockpit-border/60 max-h-[60vh] overflow-y-auto">
+      {% for r in reminders %}
+      <li class="px-4 py-3 flex flex-col gap-2">
+        <div class="text-sm text-cockpit-text">{{ r.execution_item.title }}</div>
+        <div class="text-[10px] font-mono text-cockpit-faint">
+          {{ r.get_kind_display }} · {{ r.fire_at|date:"M j g:i A" }} · {{ r.status }}
+        </div>
+        <div class="flex gap-2">
+          <form hx-post="{% url 'alerts-snooze' r.pk %}" hx-target="#alerts-overlay" hx-swap="innerHTML" class="inline">
+            {% csrf_token %}
+            <button type="submit" class="text-[10px] font-mono text-cockpit-muted hover:text-cockpit-text">Snooze 30m</button>
+          </form>
+          <form hx-post="{% url 'alerts-ack' r.pk %}" hx-target="#alerts-overlay" hx-swap="innerHTML" class="inline">
+            {% csrf_token %}
+            <button type="submit" class="text-[10px] font-mono text-cockpit-accent-bright hover:underline">Ack</button>
+          </form>
+          <button type="button" class="text-[10px] font-mono text-cockpit-muted hover:text-cockpit-accent-bright"
+                  data-lifeos-drawer="{% url 'drawer-item' r.execution_item_id %}">Open</button>
+        </div>
+      </li>
+      {% empty %}
+      <li class="px-4 py-8 text-sm text-cockpit-faint text-center">No pending alerts.</li>
+      {% endfor %}
+    </ul>
+  </div>
+</div>

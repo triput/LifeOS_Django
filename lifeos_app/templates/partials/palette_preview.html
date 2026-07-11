@@ -1,0 +1,92 @@
+{% if error %}
+<p class="px-4 py-2 text-sm text-red-400 bg-red-950/30 border-b border-red-900/50">{{ error }}</p>
+{% endif %}
+{% if success %}
+<p class="px-4 py-2 text-sm text-emerald-400/90 bg-emerald-950/20 border-b border-emerald-900/40">{{ success }}</p>
+{% endif %}
+<div class="px-4 py-3 border-b border-zinc-900">
+  <div class="flex items-center gap-2 mb-2">
+    <span class="text-[10px] font-mono uppercase tracking-widest px-2 py-0.5 rounded bg-zinc-900 text-emerald-400">{{ preview.mode }}</span>
+    <span class="text-sm text-zinc-300 truncate">{{ preview.summary }}</span>
+  </div>
+  {% if preview.warnings %}
+    <ul class="text-xs text-amber-500/90 space-y-0.5 font-mono">
+      {% for w in preview.warnings %}<li>⚠ {{ w }}</li>{% endfor %}
+    </ul>
+  {% endif %}
+</div>
+
+{% if preview.mode == "capture" and preview.capture %}
+<div class="px-4 py-3 text-xs font-mono text-zinc-500 space-y-1 border-b border-zinc-900">
+  <div><span class="text-zinc-600">Title</span> · <span class="text-zinc-300">{{ preview.capture.title }}</span></div>
+  <div><span class="text-zinc-600">Status</span> · {{ preview.capture.status }}</div>
+  {% if preview.capture.container_slug %}
+  <div><span class="text-zinc-600">Container</span> · #{{ preview.capture.container_slug }}{% if preview.capture.container_title %} ({{ preview.capture.container_title }}){% endif %}</div>
+  {% endif %}
+  {% if preview.capture.tag_slugs %}
+  <div><span class="text-zinc-600">Tags</span> · {% for t in preview.capture.tag_slugs %}@{{ t }} {% endfor %}</div>
+  {% endif %}
+  {% if preview.capture.priority %}<div><span class="text-zinc-600">Priority</span> · P{{ preview.capture.priority }}</div>{% endif %}
+  {% if preview.capture.due_at %}<div><span class="text-zinc-600">Due</span> · {{ preview.capture.due_at }}</div>{% endif %}
+  {% if preview.capture.estimated_minutes %}<div><span class="text-zinc-600">Estimate</span> · {{ preview.capture.estimated_minutes }} min</div>{% endif %}
+  {% if preview.capture.recurrence %}
+  <div><span class="text-zinc-600">Repeats</span> ·
+    {% if preview.capture.recurrence.ambiguous %}
+      <span class="text-amber-500/90">skipped (ambiguous)</span>
+    {% else %}
+      <span class="text-zinc-300">{{ preview.capture.recurrence.rrule_text }}</span>
+      {% if preview.capture.recurrence.starts_at %}
+        <span class="text-zinc-600">· starts {{ preview.capture.recurrence.starts_at }}</span>
+      {% endif %}
+      {% if preview.capture.recurrence.ends_at %}
+        <span class="text-zinc-600">· ends {{ preview.capture.recurrence.ends_at }}</span>
+      {% endif %}
+      {% if preview.capture.recurrence.next_occurrence_at %}
+        <span class="text-zinc-600">· next {{ preview.capture.recurrence.next_occurrence_at }}</span>
+      {% endif %}
+    {% endif %}
+  </div>
+  {% endif %}
+</div>
+{% endif %}
+
+{% if preview.template %}
+<div class="px-4 py-3 text-xs font-mono text-zinc-500 space-y-1 border-b border-zinc-900">
+  {% if preview.template.ok %}
+  <div><span class="text-zinc-600">Template</span> · <span class="text-zinc-300">{{ preview.template.title }}</span>
+    <span class="text-zinc-600">(#{{ preview.template.slug }})</span></div>
+  {% if preview.template.description %}
+  <div class="text-zinc-600">{{ preview.template.description }}</div>
+  {% endif %}
+  <div><span class="text-zinc-600">Will create</span> ·
+    <span class="text-zinc-300">{{ preview.template.container_count }} container(s)</span>,
+    <span class="text-zinc-300">{{ preview.template.item_count }} item(s)</span>
+  </div>
+  {% else %}
+  <div class="text-amber-500/90">{{ preview.template.message }}</div>
+  {% endif %}
+</div>
+{% endif %}
+
+{% if preview.matches %}
+<div class="px-2 py-2 max-h-48 overflow-y-auto">
+  <div class="px-2 text-[10px] font-mono uppercase tracking-widest text-zinc-600 mb-1">Matches</div>
+  {% for m in preview.matches %}
+  <button type="button"
+          class="w-full text-left rounded-lg px-3 py-2 text-sm text-zinc-300 hover:bg-zinc-900 hover:text-emerald-400"
+          name="item_id"
+          value="{{ m.id }}"
+          hx-post="{% url 'cmd-commit' %}"
+          hx-include="[name='input'],[name='csrfmiddlewaretoken']"
+          hx-vals='{"item_id": "{{ m.id }}"}'
+          hx-target="#palette-preview"
+          hx-swap="innerHTML">
+    {{ m.title }} <span class="text-zinc-600 font-mono text-xs">· {{ m.status }}</span>
+  </button>
+  {% endfor %}
+</div>
+{% endif %}
+
+<div class="px-4 py-2 text-[11px] font-mono text-zinc-600 border-t border-zinc-900">
+  <b class="text-zinc-500">⏎</b> Execute · <b class="text-zinc-500">ESC</b> Close
+</div>

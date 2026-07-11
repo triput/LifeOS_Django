@@ -1,0 +1,22 @@
+{% load lifeos_extras %}
+<section id="stability-hud"
+         class="col-span-12 md:col-span-4 rounded-xl border border-cockpit-border bg-cockpit-panel/60 p-4"
+         hx-get="{% url 'stability-hud' %}"
+         hx-trigger="refreshStability from:body"
+         hx-swap="outerHTML">
+  <div class="text-[10px] font-mono uppercase tracking-widest text-cockpit-faint mb-3">System Stability</div>
+  {% if stability %}
+    <div class="font-display text-4xl
+                {% if stability.band == 'STABLE' %}text-emerald-400
+                {% elif stability.band == 'OVERLOADED' %}text-amber-400
+                {% else %}text-cockpit-muted{% endif %}">{{ stability.index_score }}</div>
+    <div class="mt-1 text-sm text-cockpit-text">{{ stability.get_band_display }}</div>
+    <div class="mt-2 text-xs font-mono text-cockpit-faint">
+      Streak {{ stability.streak_days }}d · {{ stability.completions_count }} done ·
+      {{ stability.focus_seconds|duration_s }} focus · WIP {{ wip_count }} · Inbox {{ inbox_count }}
+    </div>
+  {% else %}
+    <div class="font-display text-4xl text-cockpit-faint">—</div>
+    <p class="mt-2 text-sm text-cockpit-faint">No snapshot yet. WIP {{ wip_count }} · Inbox {{ inbox_count }}</p>
+  {% endif %}
+</section>

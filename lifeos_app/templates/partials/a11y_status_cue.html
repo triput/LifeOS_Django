@@ -1,0 +1,8 @@
+{# Decorative status accent + screen-reader label (P5-06 / FR-UI status accents). #}
+{% load lifeos_extras %}
+<span class="accent-bar {{ bar_class|default:'h-6 shrink-0' }}"
+      data-status="{{ status }}"
+      aria-hidden="true"></span>
+<span class="sr-only">
+  Status: {{ status_label|default:status }}{% if due_label %} · {{ due_label }}{% endif %}
+</span>

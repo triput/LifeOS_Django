@@ -1,0 +1,42 @@
+{% load lifeos_extras %}
+<div class="matrix-row matrix-item-row status-row {% if item.has_unmet_dependencies %}opacity-60{% endif %}"
+     data-status="{{ item.status }}"
+     data-due="{% due_urgency item %}"
+     id="matrix-item-{{ item.pk }}">
+  <div class="grid grid-cols-[2rem_1fr_6rem_3rem_3rem] gap-2 items-center px-3 py-1.5 hover:bg-cockpit-panel/30 min-w-[640px]"
+       style="padding-left: {{ depth|add:0 }}rem">
+    <input type="checkbox" name="item_ids" value="{{ item.pk }}" form="matrix-bulk-form"
+           class="matrix-item-checkbox w-4 h-4 justify-self-center rounded border-cockpit-border bg-cockpit-bg text-cockpit-accent cursor-pointer"
+           aria-label="Select {{ item.title }}">
+    <div class="flex items-center gap-2 min-w-0">
+      {% due_urgency_label item as due_lbl %}
+      {% include "partials/a11y_status_cue.html" with status=item.status status_label=item.get_status_display due_label=due_lbl bar_class="h-6 shrink-0" %}
+      <button type="button"
+              class="text-left truncate text-sm text-cockpit-text hover:text-cockpit-accent-bright cursor-pointer"
+              data-lifeos-drawer="{% url 'drawer-item' item.pk %}">{{ item.title }}</button>
+      {% if item.has_unmet_dependencies %}
+        <span class="text-[10px] font-mono text-orange-400/90 shrink-0" title="Blocked by dependencies">Waiting</span>
+      {% endif %}
+      {% for tag in item.tags.all %}
+        <span class="hidden sm:inline">{% include "partials/tag_chip.html" with tag=tag %}</span>
+      {% endfor %}
+    </div>
+    <div id="item-badge-status-{{ item.pk }}" class="min-w-0">
+      {% include "partials/matrix_item_badge.html" with item=item field="status" %}
+    </div>
+    <div id="item-badge-priority-{{ item.pk }}" class="text-center">
+      {% include "partials/matrix_item_badge.html" with item=item field="priority" %}
+    </div>
+    <div id="item-badge-estimated_minutes-{{ item.pk }}" class="text-center">
+      {% include "partials/matrix_item_badge.html" with item=item field="estimated_minutes" %}
+    </div>
+  </div>
+  <div id="matrix-subtasks-{{ item.pk }}"></div>
+  {% if item.subtasks.exists %}
+  <div class="ml-12">
+    <button type="button" class="text-[10px] font-mono text-cockpit-faint hover:text-cockpit-muted py-1"
+            data-lifeos-expand="{% url 'matrix-subtasks' item.pk %}?{{ facets.query_string }}&depth={{ depth }}"
+            data-lifeos-expand-target="matrix-subtasks-{{ item.pk }}">▸ subtasks</button>
+  </div>
+  {% endif %}
+</div>

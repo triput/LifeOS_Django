@@ -1,0 +1,6 @@
+{% if error %}<span class="text-xs text-red-400">{{ error }}</span>{% endif %}
+{% if field == "para_state" %}
+  <span class="text-[10px] font-mono text-zinc-500">{{ container.get_para_state_display }}</span>
+{% else %}
+  <span class="text-xs font-mono text-zinc-500">P{{ container.priority }}</span>
+{% endif %}

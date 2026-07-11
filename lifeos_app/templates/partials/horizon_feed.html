@@ -1,0 +1,34 @@
+{% load lifeos_extras %}
+<section class="col-span-12 md:col-span-4 rounded-xl border border-zinc-800 bg-zinc-950/60 p-4"
+         id="horizon-feed-card"
+         hx-get="{% url 'fragment-horizon' %}"
+         hx-trigger="refreshHome from:body"
+         hx-swap="outerHTML">
+  <div class="text-[10px] font-mono uppercase tracking-widest text-zinc-500 mb-3">Horizon Feed</div>
+  {% if horizon_items %}
+    <ul class="space-y-2">
+      {% for item in horizon_items %}
+        <li class="flex gap-2 items-start rounded-md px-1 -mx-1"
+            data-status="{{ item.status }}"
+            data-due="{% due_urgency item %}">
+          {% due_urgency_label item as due_lbl %}
+          {% include "partials/a11y_status_cue.html" with status=item.status status_label=item.get_status_display due_label=due_lbl bar_class="mt-1 h-8 shrink-0" %}
+          <div class="min-w-0 flex-1">
+            <div class="text-sm text-zinc-200 truncate">{{ item.title }}</div>
+            <div class="text-[11px] font-mono text-zinc-500">
+              {% if item.due_at %}Due {{ item.due_at|date:"D H:i" }}{% else %}Queued{% endif %}
+            </div>
+          </div>
+          {% if not active_item or active_item.pk != item.pk %}
+          <form hx-post="{% url 'focus-start' item.pk %}" hx-target="#active-focus-card" hx-swap="outerHTML">
+            {% csrf_token %}
+            <button type="submit" class="text-[10px] font-mono text-zinc-600 hover:text-emerald-400" title="Start focus" aria-label="Start focus on {{ item.title }}">▶</button>
+          </form>
+          {% endif %}
+        </li>
+      {% endfor %}
+    </ul>
+  {% else %}
+    <p class="text-sm text-zinc-600">Horizon is clear. Capture via ⌘K or triage Inbox.</p>
+  {% endif %}
+</section>

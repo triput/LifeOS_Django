@@ -1,0 +1,80 @@
+<ul class="space-y-2">
+  {% for block in availability_blocks %}
+  <li class="rounded border border-cockpit-border/60 px-3 py-2 text-xs">
+    {% if editing_availability_id == block.pk %}
+    <form hx-post="{% url 'settings-availability-update' block.pk %}" hx-target="#settings-page" hx-swap="outerHTML" class="space-y-3">
+      {% csrf_token %}
+      <input type="hidden" name="settings_tab" value="availability">
+      <div class="text-[10px] font-mono uppercase tracking-widest text-cockpit-faint">Edit block</div>
+      <label class="block text-xs text-cockpit-muted">
+        Name
+        <input type="text" name="name" required value="{{ block.name }}"
+               class="mt-1 w-full rounded border border-cockpit-border bg-cockpit-panel px-2 py-1.5 text-sm text-cockpit-text">
+      </label>
+      <label class="block text-xs text-cockpit-muted">
+        Domain (optional)
+        <select name="domain_id" class="mt-1 w-full rounded border border-cockpit-border bg-cockpit-panel px-2 py-1.5 text-sm text-cockpit-text">
+          <option value="">Any domain</option>
+          {% for d in domains %}
+          <option value="{{ d.pk }}" {% if block.domain_id == d.pk %}selected{% endif %}>{{ d.name }}</option>
+          {% endfor %}
+        </select>
+      </label>
+      <div class="flex flex-wrap gap-3">
+        <label class="text-xs text-cockpit-muted">
+          Start
+          <input type="time" name="start_time" value="{{ block.start_time|time:'H:i' }}"
+                 class="mt-1 block rounded border border-cockpit-border bg-cockpit-panel px-2 py-1.5 text-sm text-cockpit-text">
+        </label>
+        <label class="text-xs text-cockpit-muted">
+          End
+          <input type="time" name="end_time" value="{{ block.end_time|time:'H:i' }}"
+                 class="mt-1 block rounded border border-cockpit-border bg-cockpit-panel px-2 py-1.5 text-sm text-cockpit-text">
+        </label>
+      </div>
+      <fieldset class="text-xs text-cockpit-muted">
+        <legend class="mb-1">Days</legend>
+        <div class="flex flex-wrap gap-3">
+          <label class="flex items-center gap-1"><input type="checkbox" name="days" value="mon" {% if block.day_monday %}checked{% endif %} class="rounded border-cockpit-border"> Mon</label>
+          <label class="flex items-center gap-1"><input type="checkbox" name="days" value="tue" {% if block.day_tuesday %}checked{% endif %} class="rounded border-cockpit-border"> Tue</label>
+          <label class="flex items-center gap-1"><input type="checkbox" name="days" value="wed" {% if block.day_wednesday %}checked{% endif %} class="rounded border-cockpit-border"> Wed</label>
+          <label class="flex items-center gap-1"><input type="checkbox" name="days" value="thu" {% if block.day_thursday %}checked{% endif %} class="rounded border-cockpit-border"> Thu</label>
+          <label class="flex items-center gap-1"><input type="checkbox" name="days" value="fri" {% if block.day_friday %}checked{% endif %} class="rounded border-cockpit-border"> Fri</label>
+          <label class="flex items-center gap-1"><input type="checkbox" name="days" value="sat" {% if block.day_saturday %}checked{% endif %} class="rounded border-cockpit-border"> Sat</label>
+          <label class="flex items-center gap-1"><input type="checkbox" name="days" value="sun" {% if block.day_sunday %}checked{% endif %} class="rounded border-cockpit-border"> Sun</label>
+        </div>
+      </fieldset>
+      <div class="flex flex-wrap gap-2">
+        <button type="submit" class="rounded border border-cockpit-accent/50 px-3 py-1.5 text-xs font-mono text-cockpit-accent-bright hover:bg-cockpit-accent/10">Save</button>
+        <button type="button" hx-get="{% url 'canvas-settings' %}?tab=availability" hx-target="#settings-page" hx-swap="outerHTML"
+                class="rounded border border-cockpit-border px-3 py-1.5 text-xs font-mono text-cockpit-muted hover:text-cockpit-text">Cancel</button>
+      </div>
+    </form>
+    {% else %}
+    <div class="flex items-start justify-between gap-2">
+      <div>
+        <div class="font-medium text-cockpit-text">{{ block.name }}</div>
+        <div class="text-cockpit-faint font-mono text-[10px] mt-0.5">
+          {{ block.start_time|time:clock_format }} – {{ block.end_time|time:clock_format }}
+          {% if block.domain %} · {{ block.domain.name }}{% endif %}
+        </div>
+        <div class="text-cockpit-faint font-mono text-[10px] mt-0.5">
+          {% if block.day_monday %}M{% endif %}{% if block.day_tuesday %}T{% endif %}{% if block.day_wednesday %}W{% endif %}{% if block.day_thursday %}T{% endif %}{% if block.day_friday %}F{% endif %}{% if block.day_saturday %}Sa{% endif %}{% if block.day_sunday %}Su{% endif %}
+        </div>
+      </div>
+      <div class="flex flex-col items-end gap-1 shrink-0">
+        <button type="button" hx-get="{% url 'settings-availability-edit' block.pk %}?tab=availability" hx-target="#settings-page" hx-swap="outerHTML"
+                class="text-[10px] font-mono text-cockpit-accent-bright/80 hover:text-cockpit-accent-bright">Edit</button>
+        <form hx-post="{% url 'settings-availability-delete' block.pk %}" hx-target="#settings-page" hx-swap="outerHTML">
+          {% csrf_token %}
+          <input type="hidden" name="settings_tab" value="availability">
+          <button type="submit" class="text-[10px] font-mono text-orange-400/80 hover:text-orange-400">Remove</button>
+        </form>
+      </div>
+    </div>
+    {% endif %}
+  </li>
+  {% empty %}
+  <li class="text-xs text-cockpit-faint">No availability blocks — auto-schedule will fail until you add one.</li>
+  {% endfor %}
+</ul>

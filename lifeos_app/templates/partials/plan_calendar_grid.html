@@ -1,0 +1,40 @@
+<div id="plan-calendar-grid" class="rounded-xl border border-cockpit-border overflow-hidden bg-cockpit-panel/30">
+  <div class="grid grid-cols-7 border-b border-cockpit-border bg-cockpit-panel/80">
+    {% for label in grid_weekday_labels %}
+    <div class="px-1 py-2 text-center text-[10px] font-mono uppercase tracking-widest text-cockpit-faint">{{ label }}</div>
+    {% endfor %}
+  </div>
+  <div class="divide-y divide-cockpit-border/60">
+    {% for week in grid_weeks %}
+    <div class="grid grid-cols-7 {% if grid_view == 'week' %}min-h-[18rem]{% else %}min-h-[5.5rem]{% endif %}">
+      {% for cell in week %}
+      <div class="border-r border-cockpit-border/40 last:border-r-0 p-1.5 {% if not cell.in_month %}opacity-40{% endif %} {% if cell.is_today %}bg-cockpit-accent/5{% endif %}">
+        <div class="flex items-center justify-between mb-1">
+          <a href="{% url 'canvas-plan' %}?day={{ cell.day|date:'Y-m-d' }}"
+             class="text-[11px] font-mono {% if cell.is_today %}text-cockpit-accent-bright{% else %}text-cockpit-muted hover:text-cockpit-text{% endif %}">
+            {{ cell.day.day }}
+          </a>
+          {% if cell.blocks %}
+          <span class="text-[9px] font-mono text-cockpit-faint">{{ cell.blocks|length }}</span>
+          {% endif %}
+        </div>
+        <ul class="space-y-0.5 {% if grid_view == 'month' %}max-h-16 overflow-hidden{% endif %}">
+          {% for block in cell.blocks %}
+          <li>
+            {% if grid_view == "week" %}
+              {% include "partials/plan_block_chip.html" with block=block show_time=1 %}
+            {% else %}
+              {% include "partials/plan_block_chip.html" with block=block %}
+            {% endif %}
+          </li>
+          {% endfor %}
+        </ul>
+      </div>
+      {% endfor %}
+    </div>
+    {% endfor %}
+  </div>
+  {% if grid_block_count == 0 %}
+  <p class="p-4 text-sm text-cockpit-faint border-t border-cockpit-border">No events in this range. Sync calendars from the day Planner, or run Auto-schedule.</p>
+  {% endif %}
+</div>

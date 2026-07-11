@@ -1,0 +1,37 @@
+{% extends "base_shell.html" %}
+{% block title %}LifeOS · Inbox{% endblock %}
+{% block canvas %}
+<div class="space-y-6 max-w-3xl">
+  <header>
+    <h1 class="font-display text-2xl text-white tracking-tight">Inbox Triage</h1>
+    <p class="mt-1 text-sm text-zinc-500">Assign orphans to a container. Processed items move to Backlog or Planned.</p>
+  </header>
+
+  <section class="rounded-xl border border-zinc-800 bg-zinc-950/60 p-4">
+    <div class="text-[10px] font-mono uppercase tracking-widest text-zinc-500 mb-3">
+      Inbox items <span class="text-zinc-600">({{ inbox_items|length }})</span>
+    </div>
+    {% if inbox_items %}
+      <div id="inbox-list" class="space-y-3">
+        {% for item in inbox_items %}
+          {% include "partials/inbox_row.html" with item=item containers=containers %}
+        {% endfor %}
+      </div>
+    {% else %}
+      <p class="text-sm text-zinc-600">Inbox zero — capture something with ⌘K.</p>
+    {% endif %}
+  </section>
+
+  {% if orphan_containers %}
+  <section class="rounded-xl border border-amber-900/40 bg-amber-950/10 p-4">
+    <div class="text-[10px] font-mono uppercase tracking-widest text-amber-600/80 mb-3">Structural orphans</div>
+    <p class="text-xs text-zinc-500 mb-2">Containers missing a domain lens (assign in Admin HUD for now).</p>
+    <ul class="text-sm text-zinc-400 space-y-1 font-mono">
+      {% for c in orphan_containers %}
+        <li>· {{ c.title }} <span class="text-zinc-600">#{{ c.slug }}</span></li>
+      {% endfor %}
+    </ul>
+  </section>
+  {% endif %}
+</div>
+{% endblock %}

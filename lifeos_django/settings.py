@@ -17,8 +17,16 @@ load_dotenv(os.path.join(BASE_DIR, '.env'))
 # Security: Keep this safe!
 SECRET_KEY = os.environ["SECRET_KEY"]
 DEBUG = os.environ.get("DEBUG", "False") == "True"
-ALLOWED_HOSTS = os.environ.get("ALLOWED_HOSTS", "localhost,127.0.0.1").split(",")
-CSRF_TRUSTED_ORIGINS = os.environ.get("CSRF_TRUSTED_ORIGINS", "").split(",") if os.environ.get("CSRF_TRUSTED_ORIGINS") else []
+ALLOWED_HOSTS = [
+    host.strip()
+    for host in os.environ.get("ALLOWED_HOSTS", "localhost,127.0.0.1").split(",")
+    if host.strip()
+]
+CSRF_TRUSTED_ORIGINS = [
+    origin.strip()
+    for origin in os.environ.get("CSRF_TRUSTED_ORIGINS", "").split(",")
+    if origin.strip()
+]
 
 
 # Security headers and cookie hardening
@@ -104,7 +112,7 @@ PASSWORD_HASHERS = [
 
 # Auth redirection parameters
 LOGIN_URL = 'login'
-LOGIN_REDIRECT_URL = 'dashboard'
+LOGIN_REDIRECT_URL = 'home'
 LOGOUT_REDIRECT_URL = 'login'
 
 # Internationalization and Timezones
@@ -124,4 +132,53 @@ DEFAULT_FROM_EMAIL = os.environ.get("DEFAULT_FROM_EMAIL", EMAIL_HOST_USER or "we
 
 # Fallback to console backend in development if SMTP credentials are not configured
 if not EMAIL_HOST_USER or not EMAIL_HOST_PASSWORD:
-    EMAIL_BACKEND = "django.core.mail.backends.console.EmailBackend"
+    EMAIL_BACKEND = "django.core.mail.backends.console.EmailBackend"
+
+# Google Calendar OAuth (ENG-CAL) — optional until Settings round
+GOOGLE_OAUTH_CLIENT_ID = os.environ.get("GOOGLE_OAUTH_CLIENT_ID", "")
+GOOGLE_OAUTH_CLIENT_SECRET = os.environ.get("GOOGLE_OAUTH_CLIENT_SECRET", "")
+GOOGLE_OAUTH_REDIRECT_URI = os.environ.get(
+    "GOOGLE_OAUTH_REDIRECT_URI",
+    "http://127.0.0.1:8000/calendar/oauth2callback/",
+)
+
+# Microsoft Graph calendar OAuth (ENG-CAL-MS)
+MICROSOFT_OAUTH_CLIENT_ID = os.environ.get("MICROSOFT_OAUTH_CLIENT_ID", "")
+MICROSOFT_OAUTH_CLIENT_SECRET = os.environ.get("MICROSOFT_OAUTH_CLIENT_SECRET", "")
+MICROSOFT_OAUTH_REDIRECT_URI = os.environ.get("MICROSOFT_OAUTH_REDIRECT_URI", "")
+
+# ---------------------------------------------------------------------------
+# Celery Beat / worker (P5-04) — reminder sweep + telemetry warm
+# ---------------------------------------------------------------------------
+# Broker: Redis by default. Override with CELERY_BROKER_URL.
+# Dev/tests without Redis: CELERY_TASK_ALWAYS_EAGER=True (or pytest/manage test).
+CELERY_BROKER_URL = os.environ.get("CELERY_BROKER_URL", "redis://127.0.0.1:6379/0")
+CELERY_RESULT_BACKEND = os.environ.get("CELERY_RESULT_BACKEND", CELERY_BROKER_URL)
+CELERY_ACCEPT_CONTENT = ["json"]
+CELERY_TASK_SERIALIZER = "json"
+CELERY_RESULT_SERIALIZER = "json"
+CELERY_TIMEZONE = TIME_ZONE
+CELERY_ENABLE_UTC = True
+CELERY_TASK_TRACK_STARTED = True
+CELERY_TASK_ALWAYS_EAGER = (
+    os.environ.get("CELERY_TASK_ALWAYS_EAGER", "False") == "True" or "test" in sys.argv
+)
+CELERY_TASK_EAGER_PROPAGATES = True
+
+from celery.schedules import crontab  # noqa: E402 — after TIME_ZONE
+
+CELERY_BEAT_SCHEDULE = {
+    "sweep-reminders-every-2-minutes": {
+        "task": "lifeos_app.sweep_reminders",
+        "schedule": 120.0,
+    },
+    "warm-telemetry-every-15-minutes": {
+        "task": "lifeos_app.warm_telemetry",
+        "schedule": 900.0,
+    },
+    "compute-stability-daily": {
+        "task": "lifeos_app.compute_stability",
+        # Owner-local midnight-ish in UTC; adjust via env later if needed.
+        "schedule": crontab(hour=12, minute=5),
+    },
+}

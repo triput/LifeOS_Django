@@ -1,0 +1,34 @@
+<div class="rounded-xl border border-cockpit-border overflow-hidden">
+  {% if schedule_message %}
+  <p class="px-3 py-2 text-xs font-mono {% if schedule_ok %}text-cockpit-accent-bright{% else %}text-orange-400{% endif %} border-b border-cockpit-border bg-cockpit-panel/60">
+    {{ schedule_message }}
+  </p>
+  {% endif %}
+  <div class="px-3 py-2 text-[10px] font-mono uppercase tracking-widest text-cockpit-faint border-b border-cockpit-border bg-cockpit-panel/80">
+    Timeline · {{ plan_day|date:"M j" }}
+  </div>
+  <div class="divide-y divide-cockpit-border/60 min-h-[12rem]">
+    {% for block in plan_blocks %}
+    <div class="flex gap-3 px-3 py-2.5 hover:bg-cockpit-panel/40 {% if block.item_id or block.event_id %}cursor-pointer{% endif %}"
+         {% if block.item_id %}data-lifeos-drawer="{% url 'drawer-item' block.item_id %}"
+         {% elif block.event_id %}data-lifeos-drawer="{% url 'drawer-calendar-event' block.event_id %}"{% endif %}>
+      <div class="w-1 rounded-full shrink-0" style="background: {{ block.color }}"></div>
+      <div class="min-w-0 flex-1">
+        <div class="text-sm text-cockpit-text truncate">{{ block.title }}</div>
+        <div class="text-[10px] font-mono text-cockpit-faint mt-0.5">
+          {{ block.start_at|time:clock_format }} – {{ block.end_at|time:clock_format }}
+          {% if block.meta %} · {{ block.meta }}{% endif %}
+          {% if block.kind == "calendar" %} · read-only{% endif %}
+        </div>
+      </div>
+      {% if block.item_id %}
+      <span class="text-[10px] font-mono text-cockpit-muted shrink-0">Edit</span>
+      {% elif block.event_id %}
+      <span class="text-[10px] font-mono text-cockpit-faint shrink-0">View</span>
+      {% endif %}
+    </div>
+    {% empty %}
+    <p class="p-6 text-sm text-cockpit-faint">No blocks for this day. Run <span class="font-mono text-cockpit-muted">Auto-schedule</span> or use ⌘K → <span class="font-mono">schedule</span>.</p>
+    {% endfor %}
+  </div>
+</div>

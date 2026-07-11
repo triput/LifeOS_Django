@@ -1,0 +1,63 @@
+{% extends "base_shell.html" %}
+
+{% block title %}LifeOS · Home{% endblock %}
+
+{% block canvas %}
+
+<div class="space-y-4">
+
+  {% include "partials/active_focus.html" %}
+
+
+
+  <div class="grid grid-cols-12 gap-4">
+
+    {% include "partials/horizon_feed.html" %}
+
+    {% include "partials/stability_hud.html" %}
+
+    {# Tier 4 Telemetry — lazy load (ENG-TELE) #}
+
+    <section class="col-span-12 md:col-span-4 rounded-xl border border-cockpit-border bg-cockpit-panel/60 p-4">
+
+      <div class="text-[10px] font-mono uppercase tracking-widest text-cockpit-faint mb-3 flex items-center justify-between">
+
+        <span>Telemetry</span>
+
+        <span class="w-2 h-2 rounded-full bg-emerald-500/80" title="Lazy-loaded"></span>
+
+      </div>
+
+      {% include "partials/telemetry_hud_skeleton.html" %}
+
+    </section>
+
+  </div>
+
+
+
+  {% if system_lists %}
+
+  <section class="rounded-xl border border-zinc-900 p-3">
+
+    <div class="text-[10px] font-mono uppercase tracking-widest text-zinc-600 mb-2">System lists</div>
+
+    <div class="flex flex-wrap gap-2">
+
+      {% for c in system_lists %}
+
+        <span class="rounded border border-zinc-800 bg-zinc-950 px-2 py-1 text-xs font-mono text-zinc-400">#{{ c.slug }}</span>
+
+      {% endfor %}
+
+    </div>
+
+  </section>
+
+  {% endif %}
+
+</div>
+
+{% endblock %}
+
+

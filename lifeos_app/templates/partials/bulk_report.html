@@ -1,0 +1,25 @@
+{% if report %}
+<section class="rounded-xl border border-cockpit-border bg-cockpit-panel/50 p-4 space-y-3" id="bulk-report-inner">
+  <div class="flex flex-wrap items-baseline justify-between gap-2">
+    <h2 class="text-[10px] font-mono uppercase tracking-widest text-cockpit-faint">Commit report</h2>
+    <p class="text-xs font-mono text-cockpit-muted">
+      {{ report.created_containers }} containers ·
+      {{ report.created_items }} items ·
+      {{ report.failed }} failed
+      {% if report.skipped %} · {{ report.skipped }} skipped{% endif %}
+    </p>
+  </div>
+  <ul class="max-h-64 overflow-y-auto divide-y divide-cockpit-border/40 text-xs font-mono">
+    {% for row in report.results %}
+    <li class="py-1.5 flex gap-3 {% if row.ok %}text-cockpit-muted{% else %}text-orange-400/90{% endif %}">
+      <span class="text-cockpit-faint w-10 shrink-0">L{{ row.line_no }}</span>
+      <span class="min-w-0 flex-1 truncate">
+        {% if row.title %}<span class="text-cockpit-text">{{ row.title }}</span> — {% endif %}{{ row.message }}
+      </span>
+    </li>
+    {% empty %}
+    <li class="py-1.5 text-cockpit-faint">No row results.</li>
+    {% endfor %}
+  </ul>
+</section>
+{% endif %}

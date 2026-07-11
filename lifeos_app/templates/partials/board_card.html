@@ -1,0 +1,26 @@
+{% load lifeos_extras %}
+<article class="board-card rounded-lg border border-cockpit-border bg-cockpit-bg/80 p-2.5 shadow-sm cursor-grab active:cursor-grabbing
+                {% if item.has_unmet_dependencies %}opacity-60{% endif %}"
+         data-item-id="{{ item.pk }}"
+         data-status="{{ item.status }}"
+         data-due="{% due_urgency item %}"
+         data-locked="{% if item.has_unmet_dependencies %}1{% else %}0{% endif %}"
+         data-estimate="{{ item.estimated_minutes }}">
+  <div class="flex items-start gap-2">
+    {% due_urgency_label item as due_lbl %}
+    {% include "partials/a11y_status_cue.html" with status=item.status status_label=item.get_status_display due_label=due_lbl bar_class="h-8 shrink-0 mt-0.5" %}
+    <div class="min-w-0 flex-1">
+      <button type="button"
+              class="text-left text-sm text-cockpit-text hover:text-cockpit-accent-bright leading-snug w-full"
+              data-lifeos-drawer="{% url 'drawer-item' item.pk %}">{{ item.title }}</button>
+      <div class="mt-1 flex flex-wrap items-center gap-1.5 text-[10px] font-mono text-cockpit-faint">
+        <span>P{{ item.priority }}</span>
+        <span>·</span>
+        <span>{{ item.estimated_minutes|duration_h }}</span>
+        {% if item.has_unmet_dependencies %}
+        <span class="text-orange-400/90">· Waiting</span>
+        {% endif %}
+      </div>
+    </div>
+  </div>
+</article>

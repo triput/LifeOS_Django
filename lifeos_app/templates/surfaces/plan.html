@@ -1,0 +1,46 @@
+{% extends "base_shell.html" %}
+{% load lifeos_extras %}
+{% block title %}LifeOS · Planner{% endblock %}
+{% block canvas %}
+<div class="space-y-4" id="plan-page">
+  <header class="flex flex-col md:flex-row md:items-end md:justify-between gap-3">
+    <div>
+      <h1 class="font-display text-2xl text-cockpit-text tracking-tight">Planner</h1>
+      <p class="mt-1 text-sm text-cockpit-muted">Day timeline — allocations and blocking calendar events</p>
+    </div>
+    <div class="flex flex-wrap items-center gap-2 text-xs font-mono">
+      <a href="{% url 'canvas-plan-calendar' %}?view=month&day={{ plan_day|date:'Y-m-d' }}"
+         class="rounded border border-cockpit-border px-2 py-1 text-cockpit-muted hover:text-cockpit-accent-bright">Month grid</a>
+      <a href="{% url 'canvas-plan' %}?day={{ plan_prev|date:'Y-m-d' }}"
+         class="rounded border border-cockpit-border px-2 py-1 text-cockpit-muted hover:text-cockpit-text">←</a>
+      <span class="text-cockpit-text px-2">{{ plan_day|date:"D, M j Y" }}</span>
+      <a href="{% url 'canvas-plan' %}?day={{ plan_next|date:'Y-m-d' }}"
+         class="rounded border border-cockpit-border px-2 py-1 text-cockpit-muted hover:text-cockpit-text">→</a>
+      <form hx-post="{% url 'schedule-run' %}"
+            hx-target="#plan-timeline"
+            hx-swap="innerHTML"
+            class="inline">
+        {% csrf_token %}
+        <button type="submit" class="rounded border border-cockpit-accent/50 px-3 py-1.5 text-cockpit-accent-bright hover:bg-cockpit-accent/10">
+          Auto-schedule
+        </button>
+      </form>
+    </div>
+  </header>
+
+  <div class="grid lg:grid-cols-[1fr_18rem] gap-4">
+    <div id="plan-timeline">
+      {% include "partials/plan_timeline.html" %}
+    </div>
+    <div id="plan-today-panel" class="space-y-0">
+      {% include "partials/plan_today_panel.html" %}
+      <div id="plan-calendar-panel"
+           hx-get="{% url 'calendar-status' %}"
+           hx-trigger="load"
+           hx-swap="innerHTML">
+        {% include "partials/plan_calendar_panel.html" %}
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock %}

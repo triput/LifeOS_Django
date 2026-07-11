@@ -1,0 +1,7 @@
+<div id="telemetry-hud"
+     class="space-y-2"
+     hx-get="{% url 'telemetry-hud' %}"
+     hx-trigger="load"
+     hx-swap="outerHTML">
+  <p class="text-sm text-cockpit-faint animate-pulse">Loading telemetry…</p>
+</div>

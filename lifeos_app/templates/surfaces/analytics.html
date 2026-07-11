@@ -1,0 +1,148 @@
+{% extends "base_shell.html" %}
+{% load lifeos_extras %}
+{% block title %}LifeOS · Analytics{% endblock %}
+{% block canvas %}
+<div class="space-y-6" id="analytics-page">
+  <header class="flex flex-col md:flex-row md:items-end md:justify-between gap-3">
+    <div>
+      <h1 class="font-display text-2xl text-cockpit-text tracking-tight">Velocity Deep Dive</h1>
+      <p class="mt-1 text-sm text-cockpit-muted">
+        Stability history, completions vs target, and focus rollups
+        <span class="font-mono text-cockpit-faint">— not on Home</span>
+      </p>
+    </div>
+    <form method="get" class="flex flex-wrap gap-2 items-end text-sm"
+          hx-get="{% url 'canvas-analytics' %}"
+          hx-target="#main-canvas"
+          hx-select="#analytics-page"
+          hx-swap="innerHTML"
+          hx-push-url="true">
+      <label class="text-[10px] font-mono uppercase tracking-widest text-cockpit-faint">
+        Window
+        <select name="days"
+                class="mt-1 block rounded border border-cockpit-border bg-cockpit-bg px-2 py-1.5 text-sm font-mono text-cockpit-text"
+                onchange="this.form.requestSubmit()">
+          {% for val, label in window_choices %}
+          <option value="{{ val }}" {% if window_days == val %}selected{% endif %}>{{ label }}</option>
+          {% endfor %}
+        </select>
+      </label>
+    </form>
+  </header>
+
+  <section class="grid grid-cols-2 md:grid-cols-4 gap-3">
+    <div class="rounded-xl border border-cockpit-border bg-cockpit-panel/50 p-3">
+      <div class="text-[10px] font-mono uppercase tracking-widest text-cockpit-faint">Avg score</div>
+      <div class="mt-1 font-display text-2xl text-cockpit-text">{{ summary.avg_score }}</div>
+      {% include "partials/stability_score_help.html" %}
+    </div>
+    <div class="rounded-xl border border-cockpit-border bg-cockpit-panel/50 p-3">
+      <div class="text-[10px] font-mono uppercase tracking-widest text-cockpit-faint">Completions</div>
+      <div class="mt-1 font-display text-2xl text-cockpit-accent-bright">{{ summary.completions_total }}</div>
+      <div class="text-[10px] font-mono text-cockpit-faint">target {{ summary.completion_target }}/day</div>
+    </div>
+    <div class="rounded-xl border border-cockpit-border bg-cockpit-panel/50 p-3">
+      <div class="text-[10px] font-mono uppercase tracking-widest text-cockpit-faint">Focus</div>
+      <div class="mt-1 font-display text-2xl text-cockpit-text">{{ summary.focus_seconds_total|duration_s }}</div>
+      <div class="text-[10px] font-mono text-cockpit-faint">target {{ summary.focus_minutes_target|duration_h }}/day</div>
+    </div>
+    <div class="rounded-xl border border-cockpit-border bg-cockpit-panel/50 p-3">
+      <div class="text-[10px] font-mono uppercase tracking-widest text-cockpit-faint">Bands</div>
+      <div class="mt-1 text-sm font-mono space-y-0.5">
+        <div><span class="text-emerald-400">{{ summary.stable_days }}</span> <span class="text-cockpit-faint">stable</span></div>
+        <div><span class="text-cockpit-muted">{{ summary.behind_days }}</span> <span class="text-cockpit-faint">behind</span></div>
+        <div><span class="text-amber-400">{{ summary.overloaded_days }}</span> <span class="text-cockpit-faint">overloaded</span></div>
+      </div>
+    </div>
+  </section>
+
+  <section class="space-y-2">
+    <h2 class="text-[10px] font-mono uppercase tracking-widest text-cockpit-faint">Stability index</h2>
+    <div class="rounded-xl border border-cockpit-border bg-cockpit-panel/40 p-4 overflow-x-auto">
+      <div class="flex items-end gap-1 h-32 min-w-full">
+        {% for p in series %}
+        <div class="flex-1 min-w-[10px] max-w-[2rem] flex flex-col items-center justify-end gap-1 h-full"
+             title="{{ p.local_date }} · {{ p.index_score }} {{ p.band_label }}">
+          <span class="text-[9px] font-mono text-cockpit-faint leading-none {% if not p.has_snapshot %}opacity-40{% endif %}">{% if p.has_snapshot %}{{ p.index_score }}{% else %}·{% endif %}</span>
+          <div class="w-full rounded-t mt-auto {% if p.band == 'STABLE' %}bg-emerald-500/70{% elif p.band == 'OVERLOADED' %}bg-amber-500/70{% elif p.band == 'BEHIND' %}bg-cockpit-muted/50{% else %}bg-cockpit-border/80{% endif %}"
+               style="height: {% if p.has_snapshot %}{% widthratio p.index_score 100 100 %}{% else %}3{% endif %}%"></div>
+        </div>
+        {% endfor %}
+      </div>
+      {% if range_start %}
+      <div class="mt-2 flex justify-between text-[9px] font-mono text-cockpit-faint">
+        <span>{{ range_start }}</span>
+        <span>{{ range_end }}</span>
+      </div>
+      {% endif %}
+    </div>
+  </section>
+
+  <section class="grid grid-cols-1 lg:grid-cols-2 gap-4">
+    <div class="space-y-2">
+      <h2 class="text-[10px] font-mono uppercase tracking-widest text-cockpit-faint">Completions vs daily target</h2>
+      <div class="rounded-xl border border-cockpit-border bg-cockpit-panel/40 p-4 overflow-x-auto">
+        <div class="flex items-end gap-1 h-24">
+          {% for p in series %}
+          {% widthratio p.completions_count max_completions 100 as bar_h %}
+          <div class="flex-1 min-w-[10px] max-w-[2rem] h-full flex flex-col justify-end"
+               title="{{ p.local_date }} · {{ p.completions_count }}/{{ p.completion_target }}">
+            <div class="w-full rounded-t {% if p.completion_pct >= 100 %}bg-emerald-500/60{% else %}bg-cockpit-accent/50{% endif %}"
+                 style="height: {% if bar_h %}{{ bar_h }}{% else %}2{% endif %}%"></div>
+          </div>
+          {% endfor %}
+        </div>
+      </div>
+    </div>
+    <div class="space-y-2">
+      <h2 class="text-[10px] font-mono uppercase tracking-widest text-cockpit-faint">Focus time</h2>
+      <div class="rounded-xl border border-cockpit-border bg-cockpit-panel/40 p-4 overflow-x-auto">
+        <div class="flex items-end gap-1 h-24">
+          {% for p in series %}
+          {% widthratio p.focus_seconds max_focus_seconds 100 as fbar %}
+          <div class="flex-1 min-w-[10px] max-w-[2rem] h-full flex flex-col justify-end"
+               title="{{ p.local_date }} · {{ p.focus_seconds|duration_s }}">
+            <div class="w-full rounded-t bg-sky-500/40"
+                 style="height: {% if fbar %}{{ fbar }}{% else %}2{% endif %}%"></div>
+          </div>
+          {% endfor %}
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <section class="space-y-2">
+    <h2 class="text-[10px] font-mono uppercase tracking-widest text-cockpit-faint">Daily detail</h2>
+    <div class="rounded-xl border border-cockpit-border overflow-x-auto">
+      <table class="w-full text-sm font-mono min-w-[36rem]">
+        <thead class="text-[10px] uppercase tracking-widest text-cockpit-faint bg-cockpit-panel/80 border-b border-cockpit-border">
+          <tr>
+            <th class="text-left px-3 py-2 font-normal">Date</th>
+            <th class="text-right px-3 py-2 font-normal">Score</th>
+            <th class="text-left px-3 py-2 font-normal">Band</th>
+            <th class="text-right px-3 py-2 font-normal">Done</th>
+            <th class="text-right px-3 py-2 font-normal">Focus</th>
+            <th class="text-right px-3 py-2 font-normal">Streak</th>
+          </tr>
+        </thead>
+        <tbody class="divide-y divide-cockpit-border/50">
+          {% for p in series_newest_first %}
+          <tr class="{% if not p.has_snapshot %}opacity-50{% endif %}">
+            <td class="px-3 py-1.5 text-cockpit-muted">{{ p.local_date }}</td>
+            <td class="px-3 py-1.5 text-right text-cockpit-text">{% if p.has_snapshot %}{{ p.index_score }}{% else %}—{% endif %}</td>
+            <td class="px-3 py-1.5 {% if p.band == 'STABLE' %}text-emerald-400{% elif p.band == 'OVERLOADED' %}text-amber-400{% else %}text-cockpit-faint{% endif %}">
+              {% if p.has_snapshot %}{{ p.band_label }}{% else %}—{% endif %}
+            </td>
+            <td class="px-3 py-1.5 text-right text-cockpit-muted">{{ p.completions_count }}<span class="text-cockpit-faint">/{{ p.completion_target }}</span></td>
+            <td class="px-3 py-1.5 text-right text-cockpit-muted" title="{{ p.focus_seconds }}s">{{ p.focus_seconds|duration_s }}</td>
+            <td class="px-3 py-1.5 text-right text-cockpit-faint">{% if p.has_snapshot %}{{ p.streak_days }}d{% else %}—{% endif %}</td>
+          </tr>
+          {% empty %}
+          <tr><td colspan="6" class="px-3 py-6 text-cockpit-faint">No history yet.</td></tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </section>
+</div>
+{% endblock %}

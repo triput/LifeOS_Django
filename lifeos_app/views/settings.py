@@ -1,371 +1,315 @@
 # ==============================================================================
-# File: f:/Code Repo/LifeOS_Django/lifeos_app/views.py
-# Description: Views implementing auth, focus engine controls, and context HUD logic
-# Component: Core / Views
+# File: lifeos_app/views/settings.py
+# Description: Settings surface — notifications, OAuth, availability (P3 round 3)
+# Component: Surfaces / Settings
 # Version: 1.0 (Gold Master)
-# Created: 2026-06-26
-# Last Update: 2026-07-01
+# Created: 2026-07-09
+# Last Update: 2026-07-10
 # ==============================================================================
-"""View controllers for the LifeOS application.
+"""Owner settings canvas — webhooks, calendar OAuth client, availability CRUD."""
 
-Contains dashboard views, HUD calculations, focus engine endpoints,
-scoped workspace handlers, and authentication routes.
-"""
-
-import os
-import json
-from django.utils import timezone
-from django.db import models
-from django.db.models import Count, Sum, Q
-from django.shortcuts import render, redirect, get_object_or_404
-from django.http import JsonResponse, HttpResponseForbidden, HttpResponse
-from django.contrib.contenttypes.models import ContentType
-from django.contrib.auth import login as auth_login, logout as auth_logout
-from django.contrib.auth.forms import AuthenticationForm
-from django.contrib import messages
 from django.contrib.auth.decorators import login_required
-from django.views.decorators.http import require_POST
-from django.core.exceptions import ValidationError
-from django.core import serializers
+from django.http import JsonResponse
+from django.shortcuts import render
+from django.views.decorators.http import require_GET, require_POST
 
-from ..models import WorkspaceContainer, ExecutionItem, AppSettings, DomainCategory, Certification, RecurringConfig, GoogleCalendar, NotionIntegration, parse_duration_to_seconds, format_seconds_to_duration, Tag, CalendarIntegration
-from ..telemetry import OpenMeteoAdapter, NoaaKpAdapter
+from lifeos_app.models import TimeAvailabilityBlock
+from lifeos_app.services.appearance import reset_domain_colors, reset_tag_colors, save_appearance_settings
+from lifeos_app.services.notify import send_test_webhook
+from lifeos_app.services.settings_surface import (
+    create_availability_block,
+    delete_availability_block,
+    resolve_settings_tab,
+    reset_telemetry_bands,
+    save_general_settings,
+    save_google_oauth_settings,
+    save_calendar_push_settings,
+    save_microsoft_oauth_settings,
+    save_notification_settings,
+    SaveResult,
+    settings_context,
+    update_availability_block,
+)
+
+
+def _request_settings_tab(request) -> str:
+    """Active tab from POST (HTMX save), GET (?tab=), or default."""
+    raw = request.POST.get("settings_tab") or request.GET.get("tab")
+    return resolve_settings_tab(raw)
+
+
+def _render_settings(request, **extra):
+    """Full page on GET; HTMX fragment only on POST (avoids nested shell)."""
+    if "settings_tab" not in extra:
+        extra["settings_tab"] = _request_settings_tab(request)
+    ctx = settings_context(settings_tab=extra.pop("settings_tab"))
+    ctx.update(extra)
+    template = "partials/settings_page.html" if request.htmx else "surfaces/settings.html"
+    return render(request, template, ctx)
+
+
+def _render_save_result(request, result: SaveResult, **extra):
+    """Render settings with SaveResult message/ok flags."""
+    return _render_settings(
+        request,
+        settings_message=result.message,
+        settings_ok=result.ok,
+        **extra,
+    )
 
 
 @login_required
+@require_GET
 def settings_view(request):
-    settings = AppSettings.get_solo()
-    if request.method == 'POST':
-        pomodoro = request.POST.get('pomodoro_duration')
-        start_hour = request.POST.get('start_of_work_day')
-        ai_sched = request.POST.get('enable_ai_scheduling') == 'on'
-        
-        # V3.0 Configurations
-        loc_name = request.POST.get('location_name', settings.location_name)
-        lat = request.POST.get('latitude')
-        lon = request.POST.get('longitude')
-        auto_loc = request.POST.get('auto_detect_location') == 'on'
-        imperial = request.POST.get('use_imperial') == 'on'
-        h24 = request.POST.get('use_24h_time') == 'on'
-        tz = request.POST.get('timezone', settings.timezone)
-        
-        hud_env = request.POST.get('hud_env', 'ENVIRONMENTAL HUD')
-        hud_domain = request.POST.get('hud_domain', 'DOMAIN VELOCITY')
-        hud_para = request.POST.get('hud_para', 'PARA ALLOCATION')
-        
-        settings.dashboard_card_names = {
-            'hud_env': hud_env,
-            'hud_domain': hud_domain,
-            'hud_para': hud_para,
-        }
+    """Settings canvas — general, notifications, calendar OAuth, availability."""
+    return _render_settings(request)
 
-        if pomodoro:
-            try:
-                settings.pomodoro_duration = int(pomodoro)
-            except ValueError:
-                pass
-        if start_hour:
-            settings.start_of_work_day = start_hour
-            
-        settings.location_name = loc_name
-        settings.auto_detect_location = auto_loc
-        settings.use_imperial = imperial
-        settings.use_24h_time = h24
-        settings.timezone = tz
-        
-        if lat:
-            try:
-                settings.latitude = float(lat)
-            except ValueError:
-                pass
-        else:
-            settings.latitude = None
-            
-        if lon:
-            try:
-                settings.longitude = float(lon)
-            except ValueError:
-                pass
-        else:
-            settings.longitude = None
 
-        settings.enable_ai_scheduling = ai_sched
-        
-        # V4.0 SLM Scheduler Settings
-        pw = request.POST.get('priority_weight')
-        uw = request.POST.get('urgency_weight')
-        if pw:
-            try: settings.priority_weight = float(pw)
-            except ValueError: pass
-        if uw:
-            try: settings.urgency_weight = float(uw)
-            except ValueError: pass
-            
-        slm_prov = request.POST.get('slm_provider')
-        if slm_prov:
-            settings.slm_provider = slm_prov
-        settings.slm_endpoint = request.POST.get('slm_endpoint', settings.slm_endpoint)
-        
-        # V5 Settings
-        db_url = request.POST.get('database_url')
-        if db_url is not None:
-            db_url = db_url.strip()
-            if db_url and not db_url.startswith(('postgresql://', 'postgres://', 'sqlite:///')):
-                messages.error(request, "Invalid Database URL format. Must start with postgresql:// or sqlite:///")
-            else:
-                import dotenv
-                from django.conf import settings as django_settings
-                env_path = django_settings.BASE_DIR / '.env'
-                # Only save if it actually changed
-                current_env = dotenv.dotenv_values(env_path)
-                if current_env.get('DATABASE_URL') != db_url:
-                    dotenv.set_key(str(env_path), 'DATABASE_URL', db_url)
-                    messages.warning(request, "Database URL changed! You MUST manually restart the Django server for this to take effect.")
+@login_required
+@require_POST
+def settings_appearance_save_view(request):
+    """Save theme mode and domain/tag colors."""
+    domain_colors: dict[int, str] = {}
+    tag_colors: dict[int, str] = {}
+    for key, value in request.POST.items():
+        if key.startswith("domain_color_"):
+            raw_id = key.removeprefix("domain_color_")
+            if raw_id.isdigit():
+                domain_colors[int(raw_id)] = value
+        elif key.startswith("tag_color_"):
+            raw_id = key.removeprefix("tag_color_")
+            if raw_id.isdigit():
+                tag_colors[int(raw_id)] = value
+    result = save_appearance_settings(
+        theme_mode=request.POST.get("theme_mode", ""),
+        domain_colors=domain_colors,
+        tag_colors=tag_colors,
+    )
+    response = _render_save_result(request, result)
+    if result.ok:
+        response["HX-Refresh"] = "true"
+    return response
 
-        # Phase 5 UI & Scheduler settings
-        settings.respect_child_dates_by_default = request.POST.get('respect_child_dates_by_default') == 'on'
-        
-        buffer_min = request.POST.get('scheduler_buffer_minutes')
-        if buffer_min:
-            try: settings.scheduler_buffer_minutes = int(buffer_min)
-            except ValueError: pass
-            
-        settings.theme_mode = request.POST.get('theme_mode', settings.theme_mode)
-        settings.theme_light_start = request.POST.get('theme_light_start', settings.theme_light_start)
-        settings.theme_dark_start = request.POST.get('theme_dark_start', settings.theme_dark_start)
 
-        settings.save()
-        messages.success(request, "Settings updated successfully!")
-        return redirect('settings')
-        
+@login_required
+@require_POST
+def settings_appearance_reset_color_view(request):
+    """Reset one or all domain/tag colors to seed catalog defaults."""
+    kind = request.POST.get("kind", "")
+    pk_raw = request.POST.get("pk", "").strip()
+    pk = int(pk_raw) if pk_raw.isdigit() else None
+    if kind == "domain":
+        result = reset_domain_colors(domain_id=pk)
+    elif kind == "domains":
+        result = reset_domain_colors(domain_id=None)
+    elif kind == "tag":
+        result = reset_tag_colors(tag_id=pk)
+    elif kind == "tags":
+        result = reset_tag_colors(tag_id=None)
+    else:
+        result = SaveResult(ok=False, message="Unknown color reset target.")
+    return _render_save_result(request, result)
+
+
+@login_required
+@require_POST
+def settings_general_save_view(request):
+    """Save timezone, scheduler buffer, location, and weather provider."""
     try:
-        import zoneinfo
-        available_timezones = sorted(zoneinfo.available_timezones())
-    except ImportError:
-        import pytz
-        available_timezones = pytz.all_timezones
-        
-    import dotenv
-    from django.conf import settings as django_settings
-    env_path = django_settings.BASE_DIR / '.env'
-    env_vars = dotenv.dotenv_values(env_path)
-    current_db_url = env_vars.get('DATABASE_URL', '')
+        buffer = int(request.POST.get("scheduler_buffer_minutes", "10"))
+    except ValueError:
+        buffer = 10
 
-    domains = DomainCategory.objects.all().order_by('name')
-    calendars = GoogleCalendar.objects.all().order_by('name')
-    tags = Tag.objects.all().order_by('name')
-    calendar_integrations = CalendarIntegration.objects.all().order_by('-created_at')
-    context = {
-        'settings': settings,
-        'timezones': available_timezones,
-        'current_db_url': current_db_url,
-        'domains': domains,
-        'calendars': calendars,
-        'tags': tags,
-        'calendar_integrations': calendar_integrations,
-    }
-    return render(request, 'settings.html', context)
-
-@login_required
-@require_POST
-def domain_add_view(request):
-    if request.method == 'POST':
-        name = request.POST.get('name', '').strip()
-        color = request.POST.get('color', '#9966CC')
-        icon = request.POST.get('icon', 'folder')
-        is_academy = request.POST.get('is_academy') == 'on'
-        
-        if name:
-            DomainCategory.objects.update_or_create(
-                name=name,
-                defaults={'color': color, 'icon': icon, 'is_academy': is_academy}
-            )
-            messages.success(request, f"Domain '{name}' configured successfully!")
-        return redirect('settings')
-    return redirect('settings')
-
-@login_required
-@require_POST
-def domain_delete_view(request, domain_id):
-    domain = get_object_or_404(DomainCategory, id=domain_id)
-    name = domain.name
-    domain.delete()
-    messages.success(request, f"Domain '{name}' deleted successfully!")
-    return redirect('settings')
-
-@login_required
-@require_POST
-def calendar_add_view(request):
-    if request.method == 'POST':
-        cal_id = request.POST.get('calendar_id', '').strip()
-        name = request.POST.get('name', 'Primary').strip()
-        if cal_id:
-            GoogleCalendar.objects.create(calendar_id=cal_id, name=name)
-            messages.success(request, f"Google Calendar '{name}' integrated successfully!")
-        return redirect('settings')
-    return redirect('settings')
-
-@login_required
-@require_POST
-def calendar_delete_view(request, calendar_id):
-    cal = get_object_or_404(GoogleCalendar, id=calendar_id)
-    name = cal.name
-    cal.delete()
-    messages.success(request, f"Calendar '{name}' disconnected.")
-    return redirect('settings')
-
-@login_required
-@require_POST
-def calendar_toggle_active_view(request, cal_id):
-    cal = get_object_or_404(GoogleCalendar, id=cal_id)
-    cal.is_active = not cal.is_active
-    cal.save()
-    messages.success(request, f"Calendar '{cal.name}' set to {'Active' if cal.is_active else 'Inactive'}.")
-    return redirect('settings')
-
-@login_required
-def tags_manager_view(request):
-    """
-    Renders the dedicated Tag Manager page with domain category scoping.
-    """
-    tags = Tag.objects.all().select_related('domain').order_by('domain__name', 'name')
-    domains = DomainCategory.objects.all().order_by('name')
-    context = {
-        'tags': tags,
-        'domains': domains,
-    }
-    return render(request, 'tags_manager.html', context)
-
-@login_required
-def tag_add_view(request):
-    if request.method == 'POST':
-        name = request.POST.get('name', '').strip()
-        color = request.POST.get('color', '#9966CC').strip()
-        domain_id = request.POST.get('domain_id')
-        
-        domain = None
-        if domain_id:
-            domain = get_object_or_404(DomainCategory, id=domain_id)
-            
-        if name:
-            Tag.objects.create(name=name, color=color, domain=domain)
-            messages.success(request, f"Tag '{name}' created successfully!")
-        else:
-            messages.error(request, "Tag name cannot be empty.")
-    return redirect('tags-manager')
-
-@login_required
-def tag_edit_view(request, tag_id):
-    tag = get_object_or_404(Tag, id=tag_id)
-    if request.method == 'POST':
-        name = request.POST.get('name', '').strip()
-        color = request.POST.get('color', '').strip()
-        domain_id = request.POST.get('domain_id')
-        
-        domain = None
-        if domain_id:
-            domain = get_object_or_404(DomainCategory, id=domain_id)
-            
-        if name:
-            tag.name = name
-            tag.domain = domain
-            if color:
-                tag.color = color
-            tag.save()
-            messages.success(request, f"Tag '{name}' updated successfully!")
-        else:
-            messages.error(request, "Tag name cannot be empty.")
-    return redirect('tags-manager')
-
-@login_required
-@require_POST
-def tag_delete_view(request, tag_id):
-    tag = get_object_or_404(Tag, id=tag_id)
-    name = tag.name
-    if tag.containers.exists() or tag.execution_items.exists():
-        messages.error(request, f"Tag '{name}' cannot be deleted because it is still associated with containers or tasks.")
-    else:
-        tag.delete()
-        messages.success(request, f"Tag '{name}' deleted successfully!")
-    return redirect('tags-manager')
-
-@login_required
-@require_POST
-def tag_retag_view(request, tag_id):
-    source_tag = get_object_or_404(Tag, id=tag_id)
-    target_action = request.POST.get('target_tag_id')
-    
-    if not target_action:
-        messages.error(request, "No action selected.")
-        return redirect('tags-manager')
-        
-    containers = list(source_tag.containers.all())
-    items = list(source_tag.execution_items.all())
-    
-    if target_action == 'clear':
-        # Remove source tag from all items
-        for c in containers:
-            c.tags.remove(source_tag)
-        for item in items:
-            item.tags.remove(source_tag)
-        messages.success(request, f"Cleared tag '{source_tag.name}' from all associated containers and tasks.")
-    else:
-        target_tag = get_object_or_404(Tag, id=target_action)
-        # Shift all items to target tag, then remove source tag
-        for c in containers:
-            c.tags.add(target_tag)
-            c.tags.remove(source_tag)
-        for item in items:
-            item.tags.add(target_tag)
-            item.tags.remove(source_tag)
-        messages.success(request, f"Re-tagged all items from '{source_tag.name}' to '{target_tag.name}'.")
-        
-    return redirect('tags-manager')
-
-@login_required
-def backup_view(request):
-    if request.method == 'POST':
+    def _optional_float(raw: str) -> float | None:
+        raw = (raw or "").strip()
+        if not raw:
+            return None
         try:
-            from ..models import DomainCategory, Tag, Certification, RecurringConfig, NotionIntegration, GoogleCalendar, CalendarIntegration, TimeAvailabilityBlock, AppSettings
-            
-            containers = WorkspaceContainer.objects.all()
-            items = ExecutionItem.objects.all()
-            domains = DomainCategory.objects.all()
-            tags = Tag.objects.all()
-            certs = Certification.objects.all()
-            recurrings = RecurringConfig.objects.all()
-            notions = NotionIntegration.objects.all()
-            calendars = GoogleCalendar.objects.all()
-            integrations = CalendarIntegration.objects.all()
-            blocks = TimeAvailabilityBlock.objects.all()
-            settings_objs = AppSettings.objects.all()
-            
-            combined_data = (
-                list(settings_objs) + list(domains) + list(tags) + list(certs) +
-                list(containers) + list(items) + list(recurrings) + list(notions) +
-                list(calendars) + list(integrations) + list(blocks)
-            )
-            serialized = serializers.serialize('json', combined_data, indent=2)
-            
-            backup_dir = os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))), 'backup')
-            if not os.path.exists(backup_dir):
-                os.makedirs(backup_dir)
-                
-            backup_file = os.path.join(backup_dir, f"lifeos_backup_{timezone.now().strftime('%Y%m%d_%H%M%S')}.json")
-            with open(backup_file, 'w') as f:
-                f.write(serialized)
-                
-            msg = f"Backup generated: {os.path.basename(backup_file)}"
-            if request.headers.get('HX-Request'):
-                return render(request, 'partials/backup_status.html', {'success': True, 'msg': msg})
-                
-            messages.success(request, msg)
-        except Exception as e:
-            err_msg = f"Backup failed: {str(e)}"
-            if request.headers.get('HX-Request'):
-                return render(request, 'partials/backup_status.html', {'success': False, 'msg': err_msg})
-            messages.error(request, err_msg)
-            
-        return redirect('settings')
-    return redirect('settings')
+            return float(raw)
+        except ValueError:
+            return None
 
+    def _optional_int(raw: str) -> int | None:
+        raw = (raw or "").strip()
+        if not raw:
+            return None
+        try:
+            return int(raw)
+        except ValueError:
+            return None
+
+    result = save_general_settings(
+        timezone=request.POST.get("timezone", ""),
+        scheduler_buffer_minutes=buffer,
+        location_name=request.POST.get("location_name", ""),
+        latitude=_optional_float(request.POST.get("latitude", "")),
+        longitude=_optional_float(request.POST.get("longitude", "")),
+        weather_provider=request.POST.get("weather_provider", ""),
+        openweather_api_key=request.POST.get("openweather_api_key", ""),
+        auto_detect_location=request.POST.get("auto_detect_location") == "on",
+        use_24h_time=request.POST.get("use_24h_time") == "on",
+        use_imperial=request.POST.get("use_imperial") == "on",
+        daily_completion_target=_optional_int(request.POST.get("daily_completion_target", "")),
+        daily_focus_minutes_target=_optional_int(request.POST.get("daily_focus_minutes_target", "")),
+        stability_streak_window_days=_optional_int(request.POST.get("stability_streak_window_days", "")),
+        weather_band_cold_max=_optional_float(request.POST.get("weather_band_cold_max", "")),
+        weather_band_moderate_max=_optional_float(request.POST.get("weather_band_moderate_max", "")),
+        weather_band_warm_max=_optional_float(request.POST.get("weather_band_warm_max", "")),
+        kp_band_blue_max=_optional_float(request.POST.get("kp_band_blue_max", "")),
+        kp_band_green_max=_optional_float(request.POST.get("kp_band_green_max", "")),
+        kp_band_yellow_max=_optional_float(request.POST.get("kp_band_yellow_max", "")),
+    )
+    return _render_save_result(request, result)
+
+
+@login_required
+@require_POST
+def settings_bands_reset_view(request):
+    """Reset weather and/or Kp telemetry band thresholds to catalog defaults."""
+    result = reset_telemetry_bands(kind=request.POST.get("kind", "all"))
+    return _render_save_result(request, result)
+
+
+@login_required
+@require_POST
+def settings_geocode_view(request):
+    """Forward-geocode location_name → lat/lon JSON (BL-TELE-005)."""
+    from lifeos_app.services.telemetry.geocode import geocode_place
+
+    raw = (request.POST.get("location_name") or "").strip()
+    result = geocode_place(raw)
+    payload: dict = {
+        "ok": result.ok,
+        "message": result.message,
+    }
+    if result.hit:
+        payload["latitude"] = result.hit.latitude
+        payload["longitude"] = result.hit.longitude
+        payload["label"] = result.hit.label
+    if result.candidates:
+        payload["candidates"] = [
+            {"label": c.label, "latitude": c.latitude, "longitude": c.longitude}
+            for c in result.candidates
+        ]
+    status = 200 if result.ok else 400
+    # Empty query is a client validation miss, not a server error
+    if not raw:
+        status = 400
+    return JsonResponse(payload, status=status)
+
+
+@login_required
+@require_POST
+def settings_notifications_save_view(request):
+    """Save webhook notification policy."""
+    try:
+        lead = int(request.POST.get("reminder_lead_minutes", "15"))
+    except ValueError:
+        lead = 15
+    result = save_notification_settings(
+        notifications_enabled=request.POST.get("notifications_enabled") == "on",
+        notification_channel=request.POST.get("notification_channel", "ntfy"),
+        notification_webhook_url=request.POST.get("notification_webhook_url", ""),
+        notification_webhook_token=request.POST.get("notification_webhook_token", ""),
+        reminder_lead_minutes=lead,
+    )
+    return _render_save_result(request, result)
+
+
+@login_required
+@require_POST
+def settings_webhook_test_view(request):
+    """POST a test payload to the configured webhook URL."""
+    result = send_test_webhook()
+    return _render_save_result(request, result)
+
+
+@login_required
+@require_POST
+def settings_google_oauth_save_view(request):
+    """Save Google OAuth client credentials."""
+    result = save_google_oauth_settings(
+        client_id=request.POST.get("google_oauth_client_id", ""),
+        client_secret=request.POST.get("google_oauth_client_secret", ""),
+        redirect_uri=request.POST.get("google_oauth_redirect_uri", ""),
+    )
+    return _render_save_result(request, result)
+
+
+@login_required
+@require_POST
+def settings_calendar_push_save_view(request):
+    """Toggle feature-flagged Google allocation push (P5-03)."""
+    result = save_calendar_push_settings(
+        enabled=request.POST.get("calendar_push_enabled") in ("1", "on", "true", "True"),
+    )
+    return _render_save_result(request, result)
+
+
+@login_required
+@require_GET
+def settings_availability_edit_view(request, block_id: int):
+    """Open inline edit form for an availability block."""
+    if not TimeAvailabilityBlock.objects.filter(pk=block_id).exists():
+        return _render_settings(
+            request,
+            settings_message="Availability block not found.",
+            settings_ok=False,
+            settings_tab="availability",
+        )
+    return _render_settings(request, editing_availability_id=block_id, settings_tab="availability")
+
+
+@login_required
+@require_POST
+def settings_availability_update_view(request, block_id: int):
+    """Save changes to an availability block."""
+    days = set(request.POST.getlist("days"))
+    domain_raw = request.POST.get("domain_id", "").strip()
+    domain_id = int(domain_raw) if domain_raw.isdigit() else None
+    result = update_availability_block(
+        block_id,
+        name=request.POST.get("name", ""),
+        domain_id=domain_id,
+        start_time=request.POST.get("start_time", "09:00"),
+        end_time=request.POST.get("end_time", "17:00"),
+        days=days,
+    )
+    return _render_save_result(request, result)
+
+
+@login_required
+@require_POST
+def settings_microsoft_oauth_save_view(request):
+    """Save Microsoft Graph OAuth client credentials."""
+    result = save_microsoft_oauth_settings(
+        client_id=request.POST.get("microsoft_oauth_client_id", ""),
+        client_secret=request.POST.get("microsoft_oauth_client_secret", ""),
+        redirect_uri=request.POST.get("microsoft_oauth_redirect_uri", ""),
+    )
+    return _render_save_result(request, result)
+
+
+@login_required
+@require_POST
+def settings_availability_create_view(request):
+    """Add a weekly availability block."""
+    days = set(request.POST.getlist("days"))
+    domain_raw = request.POST.get("domain_id", "").strip()
+    domain_id = int(domain_raw) if domain_raw.isdigit() else None
+    result = create_availability_block(
+        name=request.POST.get("name", ""),
+        domain_id=domain_id,
+        start_time=request.POST.get("start_time", "09:00"),
+        end_time=request.POST.get("end_time", "17:00"),
+        days=days,
+    )
+    return _render_save_result(request, result)
+
+
+@login_required
+@require_POST
+def settings_availability_delete_view(request, block_id: int):
+    """Delete an availability block."""
+    result = delete_availability_block(block_id)
+    return _render_save_result(request, result)

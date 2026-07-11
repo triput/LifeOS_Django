@@ -1,0 +1,40 @@
+{# Recursive academy course/specialization/module row (FR-UI-016) #}
+<div class="academy-node">
+  <div class="flex flex-wrap items-center gap-3 px-3 py-2.5 hover:bg-cockpit-bg/40">
+    <button type="button"
+            class="text-left min-w-0 flex-1 group"
+            hx-get="{% url 'drawer-container' node.container.pk %}"
+            hx-target="#drawer-overlay"
+            hx-swap="innerHTML">
+      <div class="flex flex-wrap items-baseline gap-2">
+        <span class="text-[10px] font-mono uppercase tracking-widest text-cockpit-faint">{{ node.container.get_container_type_display }}</span>
+        <span class="text-sm text-cockpit-text group-hover:text-cockpit-accent-bright truncate">{{ node.container.title }}</span>
+        {% if node.container.provider %}
+        <span class="text-[10px] font-mono text-cockpit-faint">{{ node.container.provider }}</span>
+        {% endif %}
+      </div>
+      {% if node.show_academy_fields and node.credits_earned %}
+      <div class="text-[10px] font-mono text-cockpit-faint mt-0.5">
+        {{ node.credits_earned|floatformat:-1 }}
+        {% if node.container.credit_unit_type %}{{ node.container.credit_unit_type }}{% elif node.container.certification %}{{ node.container.certification.credit_unit_type }}{% else %}credits{% endif %}
+        {% if node.container.certification %} · → {{ node.container.certification.name }}{% endif %}
+      </div>
+      {% endif %}
+    </button>
+    <div class="flex items-center gap-3 shrink-0">
+      <div class="w-24 h-1.5 rounded-full bg-cockpit-border overflow-hidden" title="{{ node.item_completed }}/{{ node.item_total }} items">
+        <div class="h-full rounded-full {% if node.percent >= 100 %}bg-emerald-400{% else %}bg-cockpit-accent{% endif %}"
+             style="width: {{ node.percent }}%"></div>
+      </div>
+      <span class="text-[10px] font-mono text-cockpit-muted w-10 text-right">{{ node.percent }}%</span>
+      <span class="text-[10px] font-mono text-cockpit-faint w-14 text-right">{{ node.item_completed }}/{{ node.item_total }}</span>
+    </div>
+  </div>
+  {% if node.children %}
+  <div class="border-l border-cockpit-border/40 ml-4 pl-1">
+    {% for child in node.children %}
+      {% include "partials/academy_course_node.html" with node=child depth=depth|add:1 %}
+    {% endfor %}
+  </div>
+  {% endif %}
+</div>

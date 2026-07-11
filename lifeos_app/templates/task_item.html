@@ -1,8 +1,0 @@
-<div id="task-{{ task.id }}" class="flex items-center space-x-2">
-    <input type="checkbox" 
-           hx-post="{% url 'toggle_task' task.id %}" 
-           hx-target="#task-{{ task.id }}" 
-           hx-swap="outerHTML"
-           {% if task.is_completed %}checked{% endif %}>
-    <span>{{ task.title }}</span>
-</div>

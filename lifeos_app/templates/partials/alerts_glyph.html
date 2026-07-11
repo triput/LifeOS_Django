@@ -1,0 +1,12 @@
+<span id="alerts-glyph" class="inline-flex items-center gap-1">
+  {% if alert_count %}
+  <span class="inline-flex h-5 min-w-[1.25rem] items-center justify-center rounded-full bg-orange-500/20 px-1 text-[10px] font-mono text-orange-300" aria-hidden="true">{{ alert_count }}</span>
+  {% endif %}
+  <button type="button"
+          class="inline-flex h-8 w-8 items-center justify-center rounded-full border border-cockpit-border text-cockpit-muted hover:text-cockpit-accent-bright"
+          hx-get="{% url 'alerts-sheet' %}"
+          hx-target="#alerts-overlay"
+          hx-swap="innerHTML"
+          aria-label="{% if alert_count %}Alerts, {{ alert_count }} pending{% else %}Alerts, none pending{% endif %}"
+          title="Alerts">◈</button>
+</span>

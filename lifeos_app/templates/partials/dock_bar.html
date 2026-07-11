@@ -1,0 +1,17 @@
+<div id="dock-bar" class="flex items-center gap-2 flex-wrap">
+  <span class="text-cockpit-faint uppercase tracking-widest">Dock</span>
+  {% for entry in dock_entries %}
+  <form hx-post="{% url 'dock-restore' entry.token %}" hx-target="#drawer-overlay" hx-swap="innerHTML" class="inline">
+    {% csrf_token %}
+    <button type="submit"
+            class="rounded border border-cockpit-border bg-cockpit-bg px-2 py-1 text-xs font-mono text-cockpit-muted hover:border-cockpit-accent hover:text-cockpit-accent-bright max-w-[12rem] truncate"
+            title="{{ entry.label }}"
+            hx-target="#drawer-overlay"
+            hx-swap="innerHTML">
+      {{ entry.label|truncatechars:24 }}
+    </button>
+  </form>
+  {% empty %}
+  <span class="opacity-50">— minimized drawers appear here</span>
+  {% endfor %}
+</div>

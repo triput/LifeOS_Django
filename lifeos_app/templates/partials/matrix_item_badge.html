@@ -1,0 +1,46 @@
+{% load lifeos_extras %}
+{% if error %}<span class="text-xs text-red-400">{{ error }}</span>{% endif %}
+{% if field == "status" %}
+  <select name="value"
+          class="rounded border border-zinc-800 bg-zinc-950 text-xs font-mono text-zinc-400 py-0.5 px-1 max-w-[7rem]"
+          aria-label="Status for {{ item.title }}"
+          hx-post="{% url 'item-patch-field' item.pk %}"
+          hx-vals='{"field": "status"}'
+          hx-include="this"
+          hx-target="#item-badge-status-{{ item.pk }}"
+          hx-swap="innerHTML"
+          {% if item.has_unmet_dependencies %}disabled title="Blocked by dependencies"{% endif %}>
+    <option value="INBOX" {% if item.status == "INBOX" %}selected{% endif %}>Inbox</option>
+    <option value="BACKLOG" {% if item.status == "BACKLOG" %}selected{% endif %}>Backlog</option>
+    <option value="PLANNED" {% if item.status == "PLANNED" %}selected{% endif %}>Planned</option>
+    <option value="IN_PROGRESS" {% if item.status == "IN_PROGRESS" %}selected{% endif %}>WIP</option>
+    <option value="BLOCKED" {% if item.status == "BLOCKED" %}selected{% endif %}>Blocked</option>
+    <option value="COMPLETED" {% if item.status == "COMPLETED" %}selected{% endif %}>Done</option>
+  </select>
+{% elif field == "priority" %}
+  <select name="value"
+          class="rounded border border-zinc-800 bg-zinc-950 text-xs font-mono text-zinc-400 py-0.5 px-1"
+          aria-label="Priority for {{ item.title }}"
+          hx-post="{% url 'item-patch-field' item.pk %}"
+          hx-vals='{"field": "priority"}'
+          hx-include="this"
+          hx-target="#item-badge-priority-{{ item.pk }}"
+          hx-swap="innerHTML">
+    {% for i in "1234" %}
+    <option value="{{ i }}" {% if item.priority|stringformat:"s" == i %}selected{% endif %}>P{{ i }}</option>
+    {% endfor %}
+  </select>
+{% elif field == "estimated_minutes" %}
+  <input type="text" name="value" value="{{ item.estimated_minutes|duration_h }}"
+         placeholder="1h 30m"
+         title="Human-readable estimate (e.g. 90m, 1h 30m)"
+         class="w-16 rounded border border-cockpit-border bg-cockpit-bg text-xs font-mono text-cockpit-muted py-0.5 px-1 mx-auto block"
+         hx-post="{% url 'item-patch-field' item.pk %}"
+         hx-vals='{"field": "estimated_minutes"}'
+         hx-include="this"
+         hx-trigger="change"
+         hx-target="#item-badge-estimated_minutes-{{ item.pk }}"
+         hx-swap="innerHTML">
+{% else %}
+  <span class="text-xs font-mono text-zinc-500">{{ item.get_status_display }}</span>
+{% endif %}

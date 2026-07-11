@@ -1,0 +1,123 @@
+<div class="rounded-xl border border-cockpit-border bg-cockpit-panel/40 p-3 space-y-2">
+
+  <div class="text-[10px] font-mono uppercase tracking-widest text-cockpit-faint">{{ p.provider_label }}</div>
+
+  {% if p.calendar_message %}
+  <p class="text-[10px] font-mono {% if p.calendar_ok %}text-cockpit-accent-bright{% else %}text-orange-400{% endif %}">{{ p.calendar_message }}</p>
+  {% endif %}
+
+  {% if p.calendar_integration %}
+    {% if not p.calendar_live %}
+    <p class="text-xs text-cockpit-muted">Demo seed event on timeline — connect for your real calendar.</p>
+    {% else %}
+    <p class="text-xs text-cockpit-muted truncate" title="{{ p.calendar_integration.user_email }}">
+      Connected · {{ p.calendar_integration.user_email|default:p.provider_label }}
+    </p>
+    {% endif %}
+    {% if p.calendar_integration.last_sync_at %}
+    <p class="text-[10px] font-mono text-cockpit-faint">Last sync {{ p.calendar_integration.last_sync_at|date:"M j g:i A" }}</p>
+    {% endif %}
+    {% if p.calendar_integration.last_sync_error %}
+    <p class="text-[10px] font-mono text-orange-400/90">{{ p.calendar_integration.last_sync_error|truncatechars:120 }}</p>
+    {% endif %}
+  {% else %}
+    <p class="text-xs text-cockpit-faint">Not connected</p>
+  {% endif %}
+
+  {% if not p.oauth_configured %}
+  <p class="text-[10px] font-mono text-orange-400/90 leading-relaxed">{{ p.oauth_setup_message }}</p>
+  {% elif p.oauth_client_id_hint %}
+  <p class="text-[10px] font-mono text-cockpit-faint">
+    Client ({{ p.oauth_config_source }}): {{ p.oauth_client_id_hint }}
+  </p>
+  {% endif %}
+
+  {% if p.oauth_redirect_uri %}
+  <p class="text-[10px] font-mono text-cockpit-faint break-all" title="{{ p.register_hint }}">
+    Redirect URI: {{ p.oauth_redirect_uri }}
+  </p>
+  {% endif %}
+
+  {% if p.calendar_live %}
+  <div class="hidden">{% csrf_token %}</div>
+  <div class="space-y-1.5 pt-1 border-t border-cockpit-border/50">
+    <div class="flex items-center justify-between gap-2">
+      <span class="text-[10px] font-mono uppercase tracking-widest text-cockpit-faint">Calendars to sync</span>
+      <form hx-post="{% url p.refresh_url_name %}"
+            hx-target="#{{ p.panel_id }}"
+            hx-swap="innerHTML"
+            class="inline">
+        {% csrf_token %}
+        <button type="submit"
+                class="text-[10px] font-mono text-cockpit-muted hover:text-cockpit-accent-bright">
+          Refresh list
+        </button>
+      </form>
+    </div>
+    {% if p.synced_calendars %}
+    <ul class="space-y-1 max-h-40 overflow-y-auto pr-1">
+      {% for cal in p.synced_calendars %}
+      <li class="flex items-center gap-2 text-xs">
+        <input type="checkbox"
+               id="cal-sync-{{ p.provider }}-{{ cal.pk }}"
+               class="rounded border-cockpit-border bg-cockpit-panel"
+               {% if cal.sync_enabled %}checked{% endif %}
+               hx-post="{% url 'calendar-toggle' cal.pk %}"
+               hx-trigger="change"
+               hx-target="#{{ p.panel_id }}"
+               hx-swap="innerHTML"
+               hx-vals="js:{sync_enabled: event.target.checked}"
+               hx-include="[name=csrfmiddlewaretoken]">
+        <input type="color"
+               name="color"
+               value="{{ cal.color }}"
+               title="Calendar color{% if cal.color_locked %} (locked){% endif %}"
+               class="h-5 w-5 cursor-pointer rounded border border-cockpit-border bg-transparent p-0 shrink-0"
+               hx-post="{% url 'calendar-color' cal.pk %}"
+               hx-trigger="change"
+               hx-target="#{{ p.panel_id }}"
+               hx-swap="innerHTML"
+               hx-include="this, [name=csrfmiddlewaretoken]">
+        <label for="cal-sync-{{ p.provider }}-{{ cal.pk }}" class="flex-1 truncate cursor-pointer text-cockpit-muted" title="{{ cal.calendar_id }}">
+          {{ cal.summary }}{% if cal.is_primary %} <span class="text-cockpit-faint">· primary</span>{% endif %}{% if cal.color_locked %} <span class="text-cockpit-faint">· custom</span>{% endif %}
+        </label>
+      </li>
+      {% endfor %}
+    </ul>
+    <p class="text-[10px] font-mono text-cockpit-faint">Check personal, work, travel, etc. then Sync now.</p>
+    {% else %}
+    <p class="text-[10px] font-mono text-cockpit-faint">Click Refresh list to load calendars from your account.</p>
+    {% endif %}
+  </div>
+  {% endif %}
+
+  <div class="flex flex-wrap gap-2 pt-1">
+    {% if p.oauth_configured %}
+    <a href="{% url p.auth_url_name %}"
+       class="rounded border border-cockpit-accent/60 bg-cockpit-accent/10 px-2 py-1 text-[10px] font-mono text-cockpit-accent-bright hover:bg-cockpit-accent/20">
+      {% if p.calendar_live %}Reconnect{% else %}Connect{% endif %}
+    </a>
+    {% else %}
+    <span class="rounded border border-cockpit-border/60 px-2 py-1 text-[10px] font-mono text-cockpit-faint cursor-not-allowed"
+          title="Configure OAuth client first">
+      Connect
+    </span>
+    <a href="{% url 'canvas-settings' %}{{ p.settings_anchor }}"
+       class="rounded border border-cockpit-border px-2 py-1 text-[10px] font-mono text-cockpit-muted hover:text-cockpit-accent-bright">
+      Settings
+    </a>
+    {% endif %}
+
+    <form hx-post="{% url p.sync_url_name %}"
+          hx-target="#{{ p.panel_id }}"
+          hx-swap="innerHTML"
+          class="inline">
+      {% csrf_token %}
+      <button type="submit"
+              class="rounded border border-cockpit-border px-2 py-1 text-[10px] font-mono text-cockpit-muted hover:text-cockpit-accent-bright hover:border-cockpit-accent/50"
+              title="{% if not p.calendar_live %}Connect first{% else %}Pull events from selected calendars{% endif %}">
+        Sync now
+      </button>
+    </form>
+  </div>
+</div>

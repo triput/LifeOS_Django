@@ -1,0 +1,29 @@
+<div class="matrix-row matrix-container-row status-row" data-status="BACKLOG">
+  <div class="grid grid-cols-[2rem_1fr_6rem_3rem_3rem] gap-2 items-center px-3 py-2 hover:bg-cockpit-panel/40 min-w-[640px]"
+       style="padding-left: {{ depth|add:0 }}rem">
+    <button type="button"
+            class="w-8 h-8 flex items-center justify-center rounded border border-cockpit-border text-cockpit-faint hover:text-cockpit-accent-bright hover:border-cockpit-accent font-mono text-sm shrink-0"
+            title="Expand to show tasks"
+            aria-label="Expand {{ container.title }}"
+            data-lifeos-expand="{% url 'matrix-children' container.pk %}?{{ facets.query_string }}&depth={{ depth }}"
+            data-lifeos-expand-target="matrix-children-{{ container.pk }}">▸</button>
+    <div class="flex items-center gap-2 min-w-0">
+      {% include "partials/a11y_status_cue.html" with status="BACKLOG" status_label="Container" bar_class="h-6 shrink-0" %}
+      <button type="button"
+              class="text-left truncate text-sm text-cockpit-text hover:text-cockpit-accent-bright font-medium cursor-pointer"
+              data-lifeos-drawer="{% url 'drawer-container' container.pk %}">
+        <span class="text-cockpit-faint font-mono text-xs">#{{ container.slug }}</span> {{ container.title }}
+      </button>
+      {% if container.domain %}
+        {% include "partials/color_chip.html" with color=container.domain.color label=container.domain.name %}
+      {% endif %}
+      {% if container.task_count or container.child_count %}
+      <span class="text-[10px] font-mono text-cockpit-faint shrink-0">{{ container.task_count }} tasks{% if container.child_count %} · {{ container.child_count }} sub{% endif %}</span>
+      {% endif %}
+    </div>
+    <span class="text-[10px] font-mono text-cockpit-faint truncate">{{ container.get_para_state_display }}</span>
+    <span class="text-xs font-mono text-cockpit-muted text-center">P{{ container.priority }}</span>
+    <span class="text-xs font-mono text-cockpit-faint text-center">—</span>
+  </div>
+  <div id="matrix-children-{{ container.pk }}" class="matrix-children"></div>
+</div>

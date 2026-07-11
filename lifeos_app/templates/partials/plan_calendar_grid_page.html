@@ -1,0 +1,29 @@
+<div class="space-y-4" id="plan-calendar-page">
+  <header class="flex flex-col md:flex-row md:items-end md:justify-between gap-3">
+    <div>
+      <div class="flex items-center gap-3 text-xs font-mono">
+        <a href="{% url 'canvas-plan' %}" class="text-cockpit-muted hover:text-cockpit-accent-bright">← Day timeline</a>
+        <span class="text-cockpit-faint">/</span>
+        <span class="text-cockpit-faint">Calendar grid</span>
+      </div>
+      <h1 class="font-display text-2xl text-cockpit-text tracking-tight mt-1">Calendar</h1>
+      <p class="mt-1 text-sm text-cockpit-muted">Merged allocations and synced calendars — read-only</p>
+    </div>
+    <div class="flex flex-wrap items-center gap-2 text-xs font-mono">
+      <a href="{% url 'canvas-plan-calendar' %}?view={{ grid_view }}&day={{ grid_prev|date:'Y-m-d' }}"
+         class="rounded border border-cockpit-border px-2 py-1 text-cockpit-muted hover:text-cockpit-text">←</a>
+      <span class="text-cockpit-text px-2 min-w-[10rem] text-center">{{ grid_title }}</span>
+      <a href="{% url 'canvas-plan-calendar' %}?view={{ grid_view }}&day={{ grid_next|date:'Y-m-d' }}"
+         class="rounded border border-cockpit-border px-2 py-1 text-cockpit-muted hover:text-cockpit-text">→</a>
+      <a href="{% url 'canvas-plan-calendar' %}?view=month&day={{ grid_anchor|date:'Y-m-d' }}"
+         class="rounded border px-2 py-1 {% if grid_view == 'month' %}border-cockpit-accent/50 text-cockpit-accent-bright{% else %}border-cockpit-border text-cockpit-muted hover:text-cockpit-text{% endif %}">Month</a>
+      <a href="{% url 'canvas-plan-calendar' %}?view=week&day={{ grid_anchor|date:'Y-m-d' }}"
+         class="rounded border px-2 py-1 {% if grid_view == 'week' %}border-cockpit-accent/50 text-cockpit-accent-bright{% else %}border-cockpit-border text-cockpit-muted hover:text-cockpit-text{% endif %}">Week</a>
+    </div>
+  </header>
+
+  <div class="grid lg:grid-cols-[1fr_14rem] gap-4">
+    {% include "partials/plan_calendar_grid.html" %}
+    {% include "partials/plan_calendar_source_filters.html" %}
+  </div>
+</div>

@@ -1,0 +1,17 @@
+<section class="board-column flex flex-col min-w-[14rem] w-56 shrink-0 rounded-xl border border-cockpit-border bg-cockpit-panel/30"
+         data-status="{{ column.status }}">
+  <header class="flex items-center justify-between gap-2 px-3 py-2 border-b border-cockpit-border">
+    <div class="flex items-center gap-2 min-w-0">
+      {% include "partials/a11y_status_cue.html" with status=column.status status_label=column.label bar_class="h-4 shrink-0" %}
+      <h2 class="text-[10px] font-mono uppercase tracking-widest text-cockpit-muted truncate">{{ column.label }}</h2>
+    </div>
+    <span class="text-[10px] font-mono text-cockpit-faint">{{ column.items|length }}</span>
+  </header>
+  <div class="board-column-list flex-1 space-y-2 p-2 min-h-[8rem]"
+       data-status="{{ column.status }}"
+       data-board-list>
+    {% for item in column.items %}
+      {% include "partials/board_card.html" with item=item %}
+    {% endfor %}
+  </div>
+</section>

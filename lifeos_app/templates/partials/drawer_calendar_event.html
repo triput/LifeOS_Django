@@ -1,0 +1,49 @@
+<div class="p-5 space-y-4">
+  <div class="flex items-start justify-between gap-3">
+    <div class="min-w-0">
+      <div class="text-[10px] font-mono uppercase tracking-widest text-cockpit-faint mb-1">External calendar</div>
+      <h2 class="font-display text-xl text-cockpit-text leading-tight">{{ event.title }}</h2>
+      {% if event.source_calendar %}
+      <div class="mt-2 flex items-center gap-2">
+        <span class="w-2 h-2 rounded-full shrink-0" style="background: {{ event.source_calendar.color }}"></span>
+        <span class="text-xs text-cockpit-muted">{{ event.source_calendar.summary }}</span>
+      </div>
+      {% endif %}
+    </div>
+    <button type="button" class="text-xs font-mono text-cockpit-faint hover:text-cockpit-text px-2 py-1 shrink-0" onclick="lifeosCloseDrawer()">✕</button>
+  </div>
+
+  <dl class="space-y-2 text-sm">
+    <div>
+      <dt class="text-[10px] font-mono uppercase tracking-widest text-cockpit-faint">When</dt>
+      <dd class="mt-0.5 text-cockpit-text font-mono text-xs">
+        {% if event.is_all_day %}
+          All day · {{ event.start_at|date:"D, M j Y" }}
+          {% if event.start_at.date != event.end_at.date %}– {{ event.end_at|date:"D, M j Y" }}{% endif %}
+        {% else %}
+          {{ event.start_at|date:"D, M j Y" }} · {{ event.start_at|time:clock_format }} – {{ event.end_at|time:clock_format }}
+        {% endif %}
+      </dd>
+    </div>
+    {% if event.integration %}
+    <div>
+      <dt class="text-[10px] font-mono uppercase tracking-widest text-cockpit-faint">Provider</dt>
+      <dd class="mt-0.5 text-cockpit-muted text-xs">{{ event.integration.get_provider_display }}</dd>
+    </div>
+    {% endif %}
+    <div>
+      <dt class="text-[10px] font-mono uppercase tracking-widest text-cockpit-faint">Busy</dt>
+      <dd class="mt-0.5 text-cockpit-muted text-xs">{% if event.is_blocking %}Blocks scheduling{% else %}Free / non-blocking{% endif %}</dd>
+    </div>
+    {% if event.description %}
+    <div>
+      <dt class="text-[10px] font-mono uppercase tracking-widest text-cockpit-faint">Description</dt>
+      <dd class="mt-1 text-sm text-cockpit-muted whitespace-pre-wrap break-words max-h-48 overflow-y-auto">{{ event.description }}</dd>
+    </div>
+    {% endif %}
+  </dl>
+
+  <p class="text-[10px] font-mono text-cockpit-faint border-t border-cockpit-border pt-3">
+    Read-only — edit this event in Google or Outlook. LifeOS allocations open the editable item drawer.
+  </p>
+</div>

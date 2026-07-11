@@ -1,0 +1,7 @@
+<div class="space-y-3" id="plan-calendar-panels">
+  {% for p in calendar_providers %}
+  <div id="{{ p.panel_id }}">
+    {% include "partials/plan_calendar_provider_panel.html" %}
+  </div>
+  {% endfor %}
+</div>

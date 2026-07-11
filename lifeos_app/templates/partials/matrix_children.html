@@ -1,0 +1,8 @@
+<div class="matrix-children-inner border-l border-zinc-800/60 ml-4">
+  {% for child in children %}
+    {% include "partials/matrix_container_row.html" with container=child facets=facets depth=depth|add:1 %}
+  {% endfor %}
+  {% for item in items %}
+    {% include "partials/matrix_item_row.html" with item=item facets=facets depth=depth|add:1 %}
+  {% endfor %}
+</div>

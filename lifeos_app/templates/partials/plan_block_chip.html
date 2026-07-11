@@ -1,0 +1,28 @@
+{# Clickable plan/calendar block chip — opens item drawer or read-only event detail. #}
+{% if block.item_id %}
+<button type="button"
+        class="{{ chip_class|default:'flex items-start gap-1 min-w-0 w-full text-left hover:opacity-90' }}"
+        title="{{ block.title }} · {{ block.start_at|time:clock_format }}{% if block.meta %} · {{ block.meta }}{% endif %}"
+        data-lifeos-drawer="{% url 'drawer-item' block.item_id %}">
+  <span class="mt-1 w-1.5 h-1.5 rounded-full shrink-0" style="background: {{ block.color }}"></span>
+  <span class="text-[10px] leading-tight text-cockpit-text truncate">
+    {% if show_time %}<span class="font-mono text-cockpit-faint">{{ block.start_at|time:clock_format_short }}</span> {% endif %}{{ block.title }}
+  </span>
+</button>
+{% elif block.event_id %}
+<button type="button"
+        class="{{ chip_class|default:'flex items-start gap-1 min-w-0 w-full text-left hover:opacity-90' }}"
+        title="{{ block.title }} · {{ block.start_at|time:clock_format }}{% if block.meta %} · {{ block.meta }}{% endif %}"
+        data-lifeos-drawer="{% url 'drawer-calendar-event' block.event_id %}">
+  <span class="mt-1 w-1.5 h-1.5 rounded-full shrink-0" style="background: {{ block.color }}"></span>
+  <span class="text-[10px] leading-tight text-cockpit-text truncate">
+    {% if show_time %}<span class="font-mono text-cockpit-faint">{{ block.start_at|time:clock_format_short }}</span> {% endif %}{{ block.title }}
+  </span>
+</button>
+{% else %}
+<span class="{{ chip_class|default:'flex items-start gap-1 min-w-0' }}"
+      title="{{ block.title }}">
+  <span class="mt-1 w-1.5 h-1.5 rounded-full shrink-0" style="background: {{ block.color }}"></span>
+  <span class="text-[10px] leading-tight text-cockpit-text truncate">{{ block.title }}</span>
+</span>
+{% endif %}

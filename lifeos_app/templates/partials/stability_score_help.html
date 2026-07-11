@@ -1,0 +1,24 @@
+<details class="mt-2 group">
+  <summary class="cursor-pointer text-[10px] font-mono text-cockpit-accent-bright/90 hover:text-cockpit-accent-bright list-none flex items-center gap-1">
+    <span aria-hidden="true" class="opacity-70">ⓘ</span>
+    <span>What is this?</span>
+  </summary>
+  <div class="mt-2 text-[11px] leading-relaxed text-cockpit-muted space-y-1.5 border-t border-cockpit-border/60 pt-2">
+    <p>
+      <span class="text-cockpit-text">Avg Score</span> is the mean daily
+      <span class="text-cockpit-text">System Stability Index</span> in this window —
+      a capacity/throughput signal against your Settings targets, not gamified points.
+    </p>
+    <p>
+      Each day scores ~55% completion ratio + ~45% focus ratio (0–100).
+      Bands: <span class="text-emerald-400">Stable</span> (≥70),
+      <span class="text-cockpit-muted">Behind</span>,
+      <span class="text-amber-400">Overloaded</span> (focus ≥1.25× target).
+    </p>
+    <p>
+      Adjust daily completion and focus targets in
+      <a href="{% url 'canvas-settings' %}?tab=general"
+         class="text-cockpit-accent-bright underline-offset-2 hover:underline">Settings → General</a>.
+    </p>
+  </div>
+</details>

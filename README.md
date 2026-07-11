@@ -1,89 +1,81 @@
 <!--
 # ==============================================================================
 # File: README.md
-# Description: Primary documentation and bootstrap instructions for the LifeOS Django repository
+# Description: Bootstrap and documentation index for LifeOS V2
 # Component: Documentation
-# Version: 6.0 (Gold Master)
+# Version: 2.0 (Gold Master)
 # Created: 2026-06-26
-# Last Update: 2026-06-30
+# Last Update: 2026-07-10
 # ==============================================================================
 -->
-# LifeOS Django (V6.0)
 
-LifeOS Django is a stability-first, single-owner personal operating system designed to run locally. Built around a unified DRY data model, it consolidates work management (Epics, Projects, Tasks) and academic learning trackers (Specializations, Courses, Modules, LearningTasks) into a cohesive relational structure. 
+# LifeOS V2 — Personal Cockpit
 
-The application utilizes server-rendered Django templates, HTMX for partial-page reactivity, and is backed by PostgreSQL or local SQLite databases (user-configurable).
+Single-owner personal operating system: calm Home canvas, Cmd+K gateway, deep surfaces on demand. Django SSR + HTMX + thin Alpine; SQLite or PostgreSQL.
 
----
-
-## Key Features
-
-*   **Unified DRY Data Model**: Combines work and study hierarchies into a type-discriminated `WorkspaceContainer` and actionable leaf-node `ExecutionItem` records.
-*   **Consolidated Focus Engine**: Universal timing controls to track focus. Supports manual time overrides (`extra_actual_seconds`) and recursive, chronological container timing roll-ups.
-*   **Fuzzy Scheduling Engine & Time Block Optimizer**: A hybrid scheduling workflow combining:
-    *   *Natural Language Parsing*: A local Small Language Model (Ollama) parses unstructured constraints (dates, priorities, urgency) into structured JSON, supporting explicit time pre-allocations.
-    *   *Deterministic Interval Solver*: A greedy solver fits task items into free slots in your schedule, taking your defined Availability Windows and synced Google Calendar events (blocking/non-blocking) into account.
-*   **Backlog Explorer & Multi-Tag Filtering**: A collapsible tree explorer with parent reassignment, task status override options, and a checkbox filter supporting positive tag matching, tag exclusions, and untagged item filtering.
-*   **Backlog Grid Editor**: A spreadsheet-style grid editor supporting explorer collapsible folding, inline auto-saving inputs (with `hx-swap="none"` protections), checkboxed tag popover edits, inline creation of sub-components, and ruby/amber/emerald/sapphire jewel-tone styles.
-*   **Inbox Triage Center**: Triages both orphaned tasks and newly created containers (e.g., Epics and Projects), defaulting items without dates into a Backlog status.
-*   **Dynamic Configurations**: Edit database backend URLs directly in settings, manage tags (with detailed usage counts, safe deletions, and bulk re-tag/clear actions), and configure timezones with searchable, auto-detecting selectors and automatic request timezone middleware.
-*   **Layered Security**: Enforces strong `Argon2` password hashing and a strict single-owner access policy via middleware that blocks and redirects unauthenticated or non-owner requests.
+**Authoritative spec:** [docs/LIFEOSV2_Alternate_SRS.md](docs/LIFEOSV2_Alternate_SRS.md)
 
 ---
 
-## Directory Index
+## Documentation
 
-*   [USER_GUIDE.md](USER_GUIDE.md) - Operations guide detailing server startup, layouts, and day-to-day use.
-*   [docs/LifeOS-SRS.md](docs/LifeOS-SRS.md) - Software Requirements Specification outlining system functional specs from versions 1.0 to 5.0.
-*   [docs/TECHNICAL_DOCS.md](docs/TECHNICAL_DOCS.md) - Technical Architecture guide outlining DB schemas, models, scheduling solver logic, and infrastructure.
-*   [validate_sandbox.py](validate_sandbox.py) - Environment verification script check.
+| Doc | Audience |
+| :--- | :--- |
+| [User Guide](docs/LIFEOSV2_USER_GUIDE.md) | Daily operation |
+| [Technical Documentation](docs/LIFEOSV2_TECHNICAL_DOCS.md) | Architecture, deploy, engines |
+| [Cmd grammar](docs/LIFEOSV2_CMD_GRAMMAR.md) | Capture / go / do tokens |
+| [Fragment inventory](docs/LIFEOSV2_FRAGMENT_INVENTORY.md) | Template ↔ endpoint map |
+| [Backlog](docs/LIFEOSV2_BACKLOG.md) | Phase status |
+| [Defects](docs/LIFEOSV2_DEFECTS.md) | Known issues |
+| [Seed catalog](docs/SEED_DATA.md) | `seed_data` coverage |
+| [AGENTS.md](AGENTS.md) | Agent / engineering rules |
 
 ---
 
-## Quick Start
+## Quick start
 
-### 1. Prerequisite Verification
-Run the verification utility to verify that your system runtimes (`python3`, `git`, `pip3`) are configured correctly:
 ```powershell
 python validate_sandbox.py
-```
-
-### 2. Dependency Installation
-Create and activate your Python virtual environment, then install requirements:
-```powershell
-# Activate venv
 .venv\Scripts\activate
-
-# Install dependencies
 pip install -r requirements.txt
-```
-
-### 3. Database Migrations
-Generate and apply database migrations to setup the schema:
-```powershell
-python manage.py makemigrations lifeos_app
+copy .env.example .env
 python manage.py migrate
-```
-
-### 4. Create Owner Superuser
-Configure your secure owner credentials:
-```powershell
-python manage.py createsuperuser
-```
-
-### 5. Running the Application
-Boot up the local development server:
-```powershell
+python manage.py create_owner --username owner --password "your-password"
+python manage.py seed_data
 python manage.py runserver
 ```
-Navigate to [http://127.0.0.1:8000/](http://127.0.0.1:8000/) in your browser.
+
+Open [http://127.0.0.1:8000/](http://127.0.0.1:8000/).
+
+Optional: set `DATABASE_URL` in `.env` for Postgres. Google/Microsoft OAuth clients can be entered in Settings → Calendars (preferred over env).
 
 ---
 
-## Running the Automated Test Suite
+## Tests
 
-Validate system components, authentication middleware, and timing models:
 ```powershell
-python manage.py test
+python manage.py test lifeos_app.tests -v 1
 ```
-*Runs the consolidated test suite including core models, focus widgets, calendar sync solvers, and triage cycle check validations.*
+
+---
+
+## Background jobs (P5-04 Celery Beat)
+
+**Preferred** (Redis + worker with embedded Beat):
+
+```powershell
+# Redis listening on 6379, then:
+celery -A lifeos_django worker -B -l info
+```
+
+Schedule: reminders every **2 min**, telemetry cache warm every **15 min**, stability daily **12:05 UTC**.
+
+**Fallback** without Redis (cron / Task Scheduler):
+
+```powershell
+python manage.py sweep_reminders
+python manage.py run_beat_jobs              # reminders + telemetry once
+python manage.py run_beat_jobs --stability  # include stability
+python manage.py sync_calendar
+python manage.py compute_stability
+```

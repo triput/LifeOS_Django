@@ -1,0 +1,47 @@
+{# Saved views chip bar — Matrix / Overview / Board (FR-UI-039) #}
+<div id="saved-views-bar" class="flex flex-wrap items-center gap-2 text-xs font-mono">
+  {% if pinned_views %}
+  <span class="text-[10px] uppercase tracking-widest text-cockpit-faint">Pinned</span>
+  {% for v in pinned_views %}
+  <a href="{% url 'saved-view-go' v.slug %}"
+     class="rounded border border-cockpit-border/80 px-2 py-1 text-cockpit-muted hover:text-cockpit-accent-bright hover:border-cockpit-accent/40"
+     hx-get="{% url 'saved-view-go' v.slug %}"
+     hx-swap="none"
+     title="{{ v.get_target_surface_display }} · {{ v.slug }}">{{ v.title }}</a>
+  {% endfor %}
+  {% endif %}
+
+  {% if saved_views %}
+  <label class="flex items-center gap-1 text-cockpit-faint">
+    <span class="text-[10px] uppercase tracking-widest">Views</span>
+    <select class="rounded border border-cockpit-border bg-cockpit-bg px-2 py-1 text-cockpit-muted max-w-[10rem]"
+            onchange="if (this.value) { if (window.htmx) { htmx.ajax('GET', this.value, {swap:'none'}); } else { window.location=this.value; } this.selectedIndex=0; }">
+      <option value="">This surface…</option>
+      {% for v in saved_views %}
+      <option value="{% url 'saved-view-go' v.slug %}">{{ v.title }}</option>
+      {% endfor %}
+    </select>
+  </label>
+  {% endif %}
+
+  <form class="flex flex-wrap items-center gap-1 ml-auto"
+        hx-post="{% url 'saved-view-save' %}"
+        hx-target="#saved-views-bar"
+        hx-swap="outerHTML">
+    {% csrf_token %}
+    <input type="hidden" name="surface" value="{{ views_surface }}">
+    <input type="hidden" name="query_string" value="{{ views_query_string }}">
+    <input type="text" name="title" required maxlength="100" placeholder="Save view as…"
+           class="rounded border border-cockpit-border bg-cockpit-bg px-2 py-1 text-cockpit-text w-36"
+           aria-label="View name">
+    <label class="flex items-center gap-1 text-cockpit-faint" title="Show in pinned strip">
+      <input type="checkbox" name="is_pinned" value="1" class="rounded border-cockpit-border">
+      Pin
+    </label>
+    <button type="submit" class="rounded border border-cockpit-accent/50 px-2 py-1 text-cockpit-accent-bright hover:bg-cockpit-accent/10">Save</button>
+  </form>
+
+  {% if views_message %}
+  <span class="w-full text-[10px] {% if views_ok %}text-emerald-400/90{% else %}text-red-400{% endif %}">{{ views_message }}</span>
+  {% endif %}
+</div>

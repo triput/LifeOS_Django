@@ -1,0 +1,35 @@
+{% load lifeos_extras %}
+<div class="rounded-xl border border-cockpit-border bg-cockpit-panel/40 p-3 space-y-3">
+  <div class="flex items-center justify-between gap-2">
+    <div class="text-[10px] font-mono uppercase tracking-widest text-cockpit-faint">#today</div>
+    <div class="flex gap-1">
+      <form hx-post="{% url 'today-plan' %}" hx-target="#plan-today-panel" hx-swap="innerHTML" class="inline">
+        {% csrf_token %}
+        <button type="submit" class="text-[10px] font-mono text-cockpit-accent-bright hover:underline">Plan</button>
+      </form>
+      <form hx-post="{% url 'today-clear' %}" hx-target="#plan-today-panel" hx-swap="innerHTML" class="inline">
+        {% csrf_token %}
+        <button type="submit" class="text-[10px] font-mono text-cockpit-faint hover:text-cockpit-text">Clear</button>
+      </form>
+    </div>
+  </div>
+  {% if today_message %}
+  <p class="text-[10px] font-mono text-cockpit-accent-bright">{{ today_message }}</p>
+  {% endif %}
+  <ul class="space-y-2">
+    {% for item in today_items %}
+    <li class="text-xs">
+      <button type="button"
+              class="text-left text-cockpit-text hover:text-cockpit-accent-bright truncate w-full"
+              data-lifeos-drawer="{% url 'drawer-item' item.pk %}">{{ item.title }}</button>
+      <div class="text-[10px] font-mono text-cockpit-faint mt-0.5">
+        P{{ item.priority }}
+        {% if item.estimated_minutes %} · {{ item.estimated_minutes|duration_h }}{% endif %}
+        {% if item.allocation %} · {{ item.allocation.start_at|time:clock_format }}{% endif %}
+      </div>
+    </li>
+    {% empty %}
+    <li class="text-xs text-cockpit-faint font-mono">Empty — ⌘K → <span class="text-cockpit-muted">plan today</span></li>
+    {% endfor %}
+  </ul>
+</div>

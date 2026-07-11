@@ -1,0 +1,202 @@
+{% load static %}
+<!DOCTYPE html>
+<html lang="en" class="h-full" data-theme="{{ theme_slug|default:'hybrid_dark' }}">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="csrf-token" content="{{ csrf_token }}">
+  <title>{% block title %}LifeOS{% endblock %}</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script src="https://unpkg.com/htmx.org@2.0.4"></script>
+  <script defer src="https://unpkg.com/alpinejs@3.14.8/dist/cdn.min.js"></script>
+  <script>
+    tailwind.config = {
+      theme: {
+        extend: {
+          colors: {
+            cockpit: {
+              bg: 'var(--cockpit-bg)',
+              panel: 'var(--cockpit-panel)',
+              border: 'var(--cockpit-border)',
+              text: 'var(--cockpit-text)',
+              muted: 'var(--cockpit-muted)',
+              faint: 'var(--cockpit-faint)',
+              accent: 'var(--cockpit-accent)',
+              'accent-bright': 'var(--cockpit-accent-bright)',
+              indigo: 'var(--cockpit-indigo)',
+              teal: '#2DD4BF',
+              purple: '#A78BFA',
+            }
+          },
+          fontFamily: {
+            sans: ['"DM Sans"', 'ui-sans-serif', 'system-ui', 'sans-serif'],
+            mono: ['"IBM Plex Mono"', 'ui-monospace', 'monospace'],
+            display: ['"Syne"', 'ui-sans-serif', 'sans-serif'],
+          }
+        }
+      }
+    }
+  </script>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=DM+Sans:ital,opsz,wght@0,9..40,400;0,9..40,500;0,9..40,600;0,9..40,700;1,9..40,400&family=IBM+Plex+Mono:wght@400;500&family=Syne:wght@600;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="{% static 'lifeos/themes.css' %}">
+  <style>
+    .accent-bar { width: 4px; border-radius: 9999px; }
+    /* Status accents use theme tokens via themes.css */
+    .lifeos-chip {
+      display: inline-block;
+      font-size: 10px;
+      font-family: "IBM Plex Mono", ui-monospace, monospace;
+      padding: 2px 6px;
+      border-radius: 4px;
+      color: var(--chip-color, #B4C4D8);
+      border: 1px solid color-mix(in srgb, var(--chip-color, #B4C4D8) 58%, transparent);
+      background: color-mix(in srgb, var(--chip-color, #B4C4D8) 24%, transparent);
+    }
+    [x-cloak] { display: none !important; }
+  </style>
+  {% block head %}{% endblock %}
+</head>
+<body class="h-full text-cockpit-text font-sans antialiased"
+      x-data="{ paletteOpen: false, railOpen: true }"
+      @keydown.window.meta.k.prevent="paletteOpen = !paletteOpen"
+      @keydown.window.ctrl.k.prevent="paletteOpen = !paletteOpen"
+      @keydown.escape.window="if (!window.lifeosCloseDrawer()) paletteOpen = false">
+  <a href="#main-canvas" class="skip-link">Skip to main content</a>
+  <div class="min-h-full flex flex-col">
+    {# Top bar #}
+    <header class="sticky top-0 z-40 border-b border-cockpit-border/80 bg-cockpit-bg/90 backdrop-blur-md"
+            role="banner">
+      <div class="flex items-center justify-between gap-4 px-4 py-3 max-w-[1600px] mx-auto w-full">
+        <div class="flex items-center gap-3">
+          <button type="button"
+                  class="text-cockpit-muted hover:text-cockpit-accent text-sm font-mono"
+                  @click="railOpen = !railOpen"
+                  :aria-expanded="railOpen.toString()"
+                  aria-controls="cockpit-rail"
+                  aria-label="Toggle navigation rail"
+                  title="Toggle rail">☰</button>
+          <a href="{% url 'home' %}" class="font-display text-xl tracking-tight text-cockpit-text hover:text-cockpit-accent transition">LifeOS</a>
+          <span class="hidden sm:inline text-xs font-mono text-cockpit-muted uppercase tracking-widest">Cockpit</span>
+        </div>
+        <div class="flex items-center gap-3 text-sm">
+          <span class="hidden md:inline font-mono text-cockpit-muted">{% now "D, M j" %}</span>
+          <button type="button"
+                  class="inline-flex items-center gap-2 rounded-lg border border-cockpit-border bg-cockpit-panel px-3 py-1.5 text-cockpit-muted hover:border-cockpit-accent hover:text-cockpit-accent-bright transition"
+                  @click="paletteOpen = true"
+                  aria-haspopup="dialog"
+                  aria-keyshortcuts="Meta+K Control+K"
+                  aria-label="Open command palette"
+                  title="Command palette">
+            <span class="font-mono text-xs" aria-hidden="true">⌘K</span>
+            <span class="hidden sm:inline">Capture / Go / Do</span>
+          </button>
+          <div id="alerts-glyph"
+               hx-get="{% url 'alerts-glyph' %}"
+               hx-trigger="load, alerts-refresh from:body"
+               hx-swap="innerHTML">
+            <span class="inline-flex h-8 w-8 items-center justify-center rounded-full border border-cockpit-border text-cockpit-muted" title="Alerts" aria-label="Alerts">◈</span>
+          </div>
+          <a href="{% url 'logout' %}" class="text-xs font-mono text-cockpit-muted hover:text-white">Logout</a>
+        </div>
+      </div>
+    </header>
+
+    <div class="flex flex-1 max-w-[1600px] mx-auto w-full">
+      {# Collapsible rail #}
+      <aside id="cockpit-rail"
+             x-show="railOpen"
+             x-cloak
+             class="w-52 shrink-0 border-r border-cockpit-border/60 p-3 hidden md:block"
+             aria-label="Primary">
+        <nav class="space-y-1 text-sm" aria-label="Cockpit surfaces">
+          <a href="{% url 'home' %}" class="block rounded-md px-3 py-2 {% if surface == 'home' %}rail-link-active{% else %}rail-link-idle{% endif %}"{% if surface == 'home' %} aria-current="page"{% endif %}>Home</a>
+          <a href="{% url 'canvas-inbox' %}" class="block rounded-md px-3 py-2 {% if surface == 'inbox' %}rail-link-active{% else %}rail-link-idle{% endif %}"{% if surface == 'inbox' %} aria-current="page"{% endif %}>Inbox</a>
+          <a href="{% url 'canvas-matrix' %}" class="block rounded-md px-3 py-2 {% if surface == 'matrix' %}rail-link-active{% else %}rail-link-idle{% endif %}"{% if surface == 'matrix' %} aria-current="page"{% endif %}>Matrix</a>
+          <a href="{% url 'canvas-bulk' %}" class="block rounded-md px-3 py-2 {% if surface == 'bulk' %}rail-link-active{% else %}rail-link-idle{% endif %}"{% if surface == 'bulk' %} aria-current="page"{% endif %}>Bulk Add</a>
+          <a href="{% url 'canvas-overview' %}" class="block rounded-md px-3 py-2 {% if surface == 'overview' %}rail-link-active{% else %}rail-link-idle{% endif %}"{% if surface == 'overview' %} aria-current="page"{% endif %}>Overview</a>
+          <a href="{% url 'canvas-plan' %}" class="block rounded-md px-3 py-2 {% if surface == 'plan' %}rail-link-active{% else %}rail-link-idle{% endif %}"{% if surface == 'plan' %} aria-current="page"{% endif %}>Planner</a>
+          <a href="{% url 'canvas-board' %}" class="block rounded-md px-3 py-2 {% if surface == 'board' %}rail-link-active{% else %}rail-link-idle{% endif %}"{% if surface == 'board' %} aria-current="page"{% endif %}>Boards</a>
+          <a href="{% url 'canvas-academy' %}" class="block rounded-md px-3 py-2 {% if surface == 'academy' %}rail-link-active{% else %}rail-link-idle{% endif %}"{% if surface == 'academy' %} aria-current="page"{% endif %}>Academy</a>
+          <a href="{% url 'canvas-analytics' %}" class="block rounded-md px-3 py-2 {% if surface == 'analytics' %}rail-link-active{% else %}rail-link-idle{% endif %}"{% if surface == 'analytics' %} aria-current="page"{% endif %}>Analytics</a>
+          <a href="{% url 'canvas-settings' %}" class="block rounded-md px-3 py-2 {% if surface == 'settings' %}rail-link-active{% else %}rail-link-idle{% endif %}"{% if surface == 'settings' %} aria-current="page"{% endif %}>Settings</a>
+          <a href="/admin/" class="block rounded-md px-3 py-2 text-cockpit-muted/70 hover:text-white font-mono text-xs mt-4">Admin HUD ↗</a>
+        </nav>
+      </aside>
+
+      <main id="main-canvas" class="flex-1 p-4 md:p-6 min-w-0" tabindex="-1">
+        {% block canvas %}{% endblock %}
+      </main>
+    </div>
+
+    {# Dock #}
+    <footer class="border-t border-cockpit-border/60 bg-cockpit-panel/80" role="contentinfo">
+      <div class="max-w-[1600px] mx-auto px-4 py-2 text-xs font-mono text-cockpit-muted">
+        <div id="dock-bar"
+             hx-get="{% url 'dock-bar' %}"
+             hx-trigger="load"
+             hx-swap="innerHTML">
+          <span class="text-cockpit-faint uppercase tracking-widest">Dock</span>
+          <span class="opacity-50"> …</span>
+        </div>
+      </div>
+    </footer>
+  </div>
+
+  {% include "partials/drawer_shell.html" %}
+  <div id="alerts-overlay"></div>
+
+  {# Cmd+K palette (P1 — capture / go / do) #}
+  <div x-show="paletteOpen" x-cloak
+       class="fixed inset-0 z-50 flex items-start justify-center pt-[15vh] p-4 bg-black/60 backdrop-blur-md"
+       role="dialog"
+       aria-modal="true"
+       aria-label="Command palette"
+       @click.self="paletteOpen = false"
+       @palette-close.window="paletteOpen = false">
+    <div class="w-full max-w-2xl overflow-hidden rounded-xl border border-cockpit-border bg-cockpit-panel shadow-2xl"
+         @click.stop>
+      <form hx-post="{% url 'cmd-commit' %}"
+            hx-swap="none"
+            @htmx:after-request.window="if (event.detail.successful && event.detail.xhr.status === 204) { paletteOpen = false }"
+            @click="typeof lifeosSyncPaletteViewContext === 'function' && lifeosSyncPaletteViewContext()">
+        {% csrf_token %}
+        <input type="hidden" name="view_surface" id="palette-view-surface" value="">
+        <input type="hidden" name="view_query_string" id="palette-view-query" value="">
+        <div class="flex items-center border-b border-cockpit-border bg-cockpit-bg/50 relative">
+          <span class="pl-4 text-cockpit-faint font-mono text-sm" aria-hidden="true">⚡</span>
+          <label for="palette-input" class="sr-only">Command input</label>
+          <input type="text"
+                 id="palette-input"
+                 name="input"
+                 class="w-full p-4 bg-transparent text-cockpit-text placeholder-cockpit-faint text-lg focus:outline-none"
+                 placeholder="Capture, go view tech-wip, save view …"
+                 autocomplete="off"
+                 aria-describedby="palette-preview"
+                 @keydown.escape="paletteOpen = false"
+                 @keydown.enter.prevent="typeof lifeosSyncPaletteViewContext === 'function' && lifeosSyncPaletteViewContext(); $el.closest('form').requestSubmit()"
+                 hx-post="{% url 'cmd-preview' %}"
+                 hx-trigger="input changed delay:200ms"
+                 hx-target="#palette-preview"
+                 hx-swap="innerHTML"
+                 hx-include="closest form"
+                 x-ref="paletteInput"
+                 x-init="$watch('paletteOpen', v => { if (v) { typeof lifeosSyncPaletteViewContext === 'function' && lifeosSyncPaletteViewContext(); $nextTick(() => $refs.paletteInput.focus()) } })">
+          <kbd class="absolute right-4 px-2 py-0.5 rounded text-xs font-mono bg-cockpit-panel text-cockpit-muted border border-cockpit-border" aria-hidden="true">ESC</kbd>
+        </div>
+        <div id="palette-preview" role="status" aria-live="polite">
+          <div class="p-3 text-xs font-mono uppercase tracking-wider text-cockpit-faint">Suggested</div>
+          <div class="px-2 pb-3 space-y-0.5">
+            <button type="button" class="w-full text-left rounded-lg p-3 text-sm text-cockpit-text hover:bg-cockpit-bg hover:text-cockpit-accent-bright" @click="$refs.paletteInput.value='go inbox'; $refs.paletteInput.dispatchEvent(new Event('input'))">go inbox</button>
+            <button type="button" class="w-full text-left rounded-lg p-3 text-sm text-cockpit-text hover:bg-cockpit-bg hover:text-cockpit-accent-bright" @click="$refs.paletteInput.value='go view tech-wip'; $refs.paletteInput.dispatchEvent(new Event('input'))">go view tech-wip</button>
+            <button type="button" class="w-full text-left rounded-lg p-3 text-sm text-cockpit-text hover:bg-cockpit-bg hover:text-cockpit-accent-bright" @click="$refs.paletteInput.value='focus shell'; $refs.paletteInput.dispatchEvent(new Event('input'))">focus shell</button>
+          </div>
+        </div>
+      </form>
+    </div>
+  </div>
+  {% include "partials/cockpit_script.html" %}
+  {% block scripts %}{% endblock %}
+</body>
+</html>

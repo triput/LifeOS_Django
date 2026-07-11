@@ -1,0 +1,246 @@
+{% extends "base_shell.html" %}
+{% load lifeos_extras %}
+{% block title %}LifeOS · Boards{% endblock %}
+{% block head %}
+<script src="https://cdn.jsdelivr.net/npm/sortablejs@1.15.2/Sortable.min.js"></script>
+{% endblock %}
+{% block canvas %}
+<div class="space-y-4" id="board-page"
+     data-move-url="{% url 'board-move' %}"
+     data-reorder-url="{% url 'board-reorder' %}"
+     data-views-surface="board"
+     data-views-query="{{ facets.query_string }}">
+  <header class="flex flex-col lg:flex-row lg:items-end lg:justify-between gap-3">
+    <div>
+      <h1 class="font-display text-2xl text-cockpit-text tracking-tight">Boards</h1>
+      <p class="mt-1 text-sm text-cockpit-muted">
+        {% if board_mode == mode_stack %}
+        Priority stack-rank — drag to reorder · estimates shown for roadmap feel
+        {% else %}
+        Status Kanban — drag across columns · dependency-locked cards cannot complete
+        {% endif %}
+        <span class="font-mono text-cockpit-faint">({{ item_count }})</span>
+      </p>
+    </div>
+    <div class="flex flex-wrap gap-2 items-end">
+      <div class="flex rounded border border-cockpit-border overflow-hidden text-[10px] font-mono uppercase tracking-widest">
+        <a href="{% url 'canvas-board' %}{% if status_mode_qs %}?{{ status_mode_qs }}{% endif %}"
+           class="px-3 py-1.5 {% if board_mode == mode_status %}bg-cockpit-accent/20 text-cockpit-accent-bright{% else %}text-cockpit-faint hover:text-cockpit-muted{% endif %}"
+           hx-get="{% url 'canvas-board' %}{% if status_mode_qs %}?{{ status_mode_qs }}{% endif %}"
+           hx-target="#main-canvas"
+           hx-select="#board-page"
+           hx-swap="innerHTML"
+           hx-push-url="true">Status</a>
+        <a href="{% url 'canvas-board' %}?{{ stack_mode_qs }}"
+           class="px-3 py-1.5 border-l border-cockpit-border {% if board_mode == mode_stack %}bg-cockpit-accent/20 text-cockpit-accent-bright{% else %}text-cockpit-faint hover:text-cockpit-muted{% endif %}"
+           hx-get="{% url 'canvas-board' %}?{{ stack_mode_qs }}"
+           hx-target="#main-canvas"
+           hx-select="#board-page"
+           hx-swap="innerHTML"
+           hx-push-url="true">Stack-rank</a>
+      </div>
+      <form method="get" class="flex flex-wrap gap-2 items-end text-sm"
+            hx-get="{% url 'canvas-board' %}"
+            hx-target="#main-canvas"
+            hx-select="#board-page"
+            hx-swap="innerHTML"
+            hx-push-url="true">
+        {% if board_mode == mode_stack %}<input type="hidden" name="mode" value="stack">{% endif %}
+        <input type="search" name="q" value="{{ facets.q }}" placeholder="Search…"
+               class="rounded border border-cockpit-border bg-cockpit-bg px-2 py-1.5 text-cockpit-text font-mono text-xs w-36">
+        <select name="domain" class="rounded border border-cockpit-border bg-cockpit-bg px-2 py-1.5 text-cockpit-muted text-xs">
+          <option value="">All domains</option>
+          {% for d in domains %}
+          <option value="{{ d.slug }}" {% if facets.domain == d.slug %}selected{% endif %}>{{ d.name }}</option>
+          {% endfor %}
+        </select>
+        <select name="tag" class="rounded border border-cockpit-border bg-cockpit-bg px-2 py-1.5 text-cockpit-muted text-xs">
+          <option value="">Any tag</option>
+          {% for t in tags %}
+          <option value="{{ t.name }}" {% if facets.tag == t.name %}selected{% endif %}>{{ t.name }}</option>
+          {% endfor %}
+        </select>
+        {% if board_mode == mode_status %}
+        <label class="flex items-center gap-1 text-xs font-mono text-cockpit-muted">
+          <input type="checkbox" name="show_completed" value="1" {% if facets.show_completed %}checked{% endif %} class="rounded border-cockpit-border">
+          Completed
+        </label>
+        {% endif %}
+        <button type="submit" class="rounded border border-cockpit-border px-3 py-1.5 text-xs font-mono text-cockpit-accent-bright hover:bg-cockpit-panel">Apply</button>
+      </form>
+    </div>
+  </header>
+
+  {% include "partials/saved_views_bar.html" %}
+
+  <p id="board-status" class="text-[10px] font-mono text-cockpit-faint min-h-[1rem]" role="status" aria-live="polite"></p>
+
+  {% if board_mode == mode_stack %}
+  <div class="rounded-xl border border-cockpit-border bg-cockpit-panel/20 p-3 max-w-2xl">
+    <div class="text-[10px] font-mono uppercase tracking-widest text-cockpit-faint mb-2">Stack order · estimate</div>
+    <div id="board-stack-list" class="space-y-2" data-board-stack>
+      {% for item in stack_items %}
+        {% include "partials/board_card.html" with item=item %}
+      {% empty %}
+      <p class="p-4 text-sm text-cockpit-faint">No items match facets.</p>
+      {% endfor %}
+    </div>
+  </div>
+  {% else %}
+  <div class="flex gap-3 overflow-x-auto pb-2" id="board-kanban">
+    {% for column in columns %}
+      {% include "partials/board_column.html" with column=column %}
+    {% endfor %}
+  </div>
+  {% endif %}
+</div>
+{% endblock %}
+{% block scripts %}
+<script>
+(function () {
+  function csrf() {
+    var m = document.querySelector('meta[name="csrf-token"]');
+    return m ? m.getAttribute("content") : "";
+  }
+  function statusEl() {
+    return document.getElementById("board-status");
+  }
+  function setStatus(msg, isError) {
+    var el = statusEl();
+    if (!el) return;
+    el.textContent = msg || "";
+    el.className = isError
+      ? "text-[10px] font-mono text-orange-400 min-h-[1rem]"
+      : "text-[10px] font-mono text-cockpit-faint min-h-[1rem]";
+  }
+  function pageRoot() {
+    return document.getElementById("board-page");
+  }
+  function orderedIds(listEl) {
+    return Array.prototype.map.call(listEl.querySelectorAll("[data-item-id]"), function (el) {
+      return el.getAttribute("data-item-id");
+    });
+  }
+  function postForm(url, fields) {
+    var body = new URLSearchParams();
+    Object.keys(fields).forEach(function (k) {
+      var v = fields[k];
+      if (Array.isArray(v)) {
+        v.forEach(function (x) { body.append(k, x); });
+      } else {
+        body.set(k, v);
+      }
+    });
+    return fetch(url, {
+      method: "POST",
+      credentials: "same-origin",
+      headers: {
+        "X-Requested-With": "XMLHttpRequest",
+        "X-CSRFToken": csrf(),
+      },
+      body: body,
+    }).then(function (res) {
+      return res.json().then(function (data) {
+        return { ok: res.ok && data.ok, status: res.status, data: data };
+      });
+    });
+  }
+  function initKanban() {
+    var root = pageRoot();
+    if (!root || typeof Sortable === "undefined") return;
+    var moveUrl = root.getAttribute("data-move-url");
+    document.querySelectorAll("[data-board-list]").forEach(function (listEl) {
+      Sortable.create(listEl, {
+        group: "lifeos-board",
+        animation: 150,
+        draggable: ".board-card",
+        ghostClass: "opacity-40",
+        onMove: function (evt) {
+          var card = evt.dragged;
+          var toList = evt.to;
+          if (!card || !toList) return true;
+          var locked = card.getAttribute("data-locked") === "1";
+          var toStatus = toList.getAttribute("data-status");
+          if (locked && toStatus === "COMPLETED") {
+            setStatus("Cannot complete — waiting on prerequisites.", true);
+            return false;
+          }
+          return true;
+        },
+        onEnd: function (evt) {
+          var card = evt.item;
+          var toList = evt.to;
+          if (!card || !toList) return;
+          var itemId = card.getAttribute("data-item-id");
+          var toStatus = toList.getAttribute("data-status");
+          var ids = orderedIds(toList);
+          setStatus("Saving…");
+          postForm(moveUrl, {
+            item_id: itemId,
+            status: toStatus,
+            ordered_ids: ids,
+          }).then(function (pack) {
+            if (!pack.ok) {
+              setStatus((pack.data && pack.data.message) || "Move failed.", true);
+              // Reload board to restore server truth
+              if (window.htmx) {
+                htmx.ajax("GET", window.location.pathname + window.location.search, {
+                  target: "#main-canvas",
+                  select: "#board-page",
+                  swap: "innerHTML",
+                });
+              }
+              return;
+            }
+            card.setAttribute("data-status", toStatus);
+            var bar = card.querySelector(".accent-bar");
+            if (bar) bar.setAttribute("data-status", toStatus);
+            setStatus("Saved.");
+          }).catch(function () {
+            setStatus("Move request failed.", true);
+          });
+        },
+      });
+    });
+  }
+  function initStack() {
+    var root = pageRoot();
+    var list = document.getElementById("board-stack-list");
+    if (!root || !list || typeof Sortable === "undefined") return;
+    var reorderUrl = root.getAttribute("data-reorder-url");
+    Sortable.create(list, {
+      animation: 150,
+      draggable: ".board-card",
+      ghostClass: "opacity-40",
+      onEnd: function () {
+        var ids = orderedIds(list);
+        setStatus("Saving order…");
+        postForm(reorderUrl, { ordered_ids: ids }).then(function (pack) {
+          if (!pack.ok) {
+            setStatus((pack.data && pack.data.message) || "Reorder failed.", true);
+            return;
+          }
+          setStatus("Order saved.");
+        }).catch(function () {
+          setStatus("Reorder request failed.", true);
+        });
+      },
+    });
+  }
+  function boot() {
+    if (document.getElementById("board-kanban")) initKanban();
+    if (document.getElementById("board-stack-list")) initStack();
+  }
+  if (document.readyState === "loading") {
+    document.addEventListener("DOMContentLoaded", boot);
+  } else {
+    boot();
+  }
+  document.body.addEventListener("htmx:afterSwap", function (evt) {
+    if (evt.detail.target && (evt.detail.target.id === "main-canvas" || evt.detail.target.id === "board-page")) {
+      boot();
+    }
+  });
+})();
+</script>
+{% endblock %}

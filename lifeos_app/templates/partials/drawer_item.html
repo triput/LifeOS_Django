@@ -1,0 +1,206 @@
+{% load lifeos_extras %}
+<div class="p-5 space-y-4" data-status="{{ item.status }}" id="drawer-item-{{ item.pk }}">
+  <div class="flex items-start justify-between gap-3">
+    <div class="min-w-0 flex-1">
+      <div class="flex items-center gap-2 mb-2">
+        {% include "partials/a11y_status_cue.html" with status=item.status status_label=item.get_status_display bar_class="h-8" %}
+        <select name="value"
+                class="rounded border border-cockpit-border bg-cockpit-bg text-[10px] font-mono uppercase tracking-widest text-cockpit-muted py-1 px-2"
+                aria-label="Status for {{ item.title }}"
+                hx-post="{% url 'item-patch-field' item.pk %}"
+                hx-vals='{"field": "status", "return": "drawer"}'
+                hx-include="this"
+                hx-target="#drawer-overlay"
+                hx-swap="innerHTML"
+                hx-trigger="change"
+                {% if item.has_unmet_dependencies %}title="Some statuses blocked by dependencies"{% endif %}>
+          {% for val, label in status_choices %}
+          <option value="{{ val }}" {% if item.status == val %}selected{% endif %}>{{ label }}</option>
+          {% endfor %}
+        </select>
+      </div>
+      <input type="text" name="value" value="{{ item.title }}" id="drawer-item-title-{{ item.pk }}"
+             class="w-full font-display text-xl text-cockpit-text leading-tight bg-transparent border-b border-transparent focus:border-cockpit-accent outline-none py-0.5"
+             hx-post="{% url 'item-patch-field' item.pk %}"
+             hx-vals='{"field": "title", "return": "drawer"}'
+             hx-include="this"
+             hx-target="#drawer-overlay"
+             hx-swap="innerHTML"
+             hx-trigger="change delay:400ms"
+             hx-preserve
+             aria-label="Title">
+      {% with primary=item.primary_container %}
+      {% if primary and primary.domain %}
+      <div class="mt-2">{% include "partials/color_chip.html" with color=primary.domain.color label=primary.domain.name %}</div>
+      {% endif %}
+      {% endwith %}
+      {% if item.tags.all %}
+      <div class="mt-2 flex flex-wrap gap-1">
+        {% for tag in item.tags.all %}
+        {% include "partials/tag_chip.html" with tag=tag %}
+        {% endfor %}
+      </div>
+      {% endif %}
+    </div>
+    <div class="flex gap-1 shrink-0">
+      <form hx-post="{% url 'drawer-minimize' %}" hx-target="#dock-bar" hx-swap="innerHTML" hx-on::after-request="lifeosCloseDrawer()">
+        {% csrf_token %}
+        <input type="hidden" name="kind" value="item">
+        <input type="hidden" name="id" value="{{ item.pk }}">
+        <input type="hidden" name="label" value="{{ item.title }}">
+        <button type="submit" class="text-xs font-mono text-cockpit-faint hover:text-cockpit-text px-2 py-1" title="Minimize to dock">—</button>
+      </form>
+      <button type="button" class="text-xs font-mono text-cockpit-faint hover:text-cockpit-text px-2 py-1" onclick="lifeosCloseDrawer()">✕</button>
+    </div>
+  </div>
+
+  {% if drawer_error %}
+  <div class="rounded border border-red-900/50 bg-red-950/30 px-3 py-2 text-xs text-red-400 font-mono">{{ drawer_error }}</div>
+  {% endif %}
+  {% if drawer_notice %}
+  <div class="rounded border border-cockpit-accent/30 bg-cockpit-accent/5 px-3 py-2 text-xs text-cockpit-accent-bright font-mono">{{ drawer_notice }}</div>
+  {% endif %}
+
+  {% if blocked_deps %}
+  <div class="rounded border border-amber-900/40 bg-amber-950/20 px-3 py-2 text-xs text-amber-500/90 font-mono">
+    Waiting on: {% for dep in blocked_deps %}{{ dep.to_item.title }}{% if not forloop.last %}, {% endif %}{% endfor %}
+  </div>
+  {% endif %}
+
+  <div class="grid grid-cols-2 gap-3 text-sm">
+    <label class="block">
+      <span class="text-[10px] font-mono uppercase text-cockpit-faint">Priority</span>
+      <select name="value"
+              class="mt-1 w-full rounded border border-cockpit-border bg-cockpit-bg px-2 py-1.5 text-sm font-mono text-cockpit-text"
+              hx-post="{% url 'item-patch-field' item.pk %}"
+              hx-vals='{"field": "priority", "return": "drawer"}'
+              hx-include="this"
+              hx-target="#drawer-overlay"
+              hx-swap="innerHTML"
+              hx-trigger="change">
+        {% for val, label in priority_choices %}
+        <option value="{{ val }}" {% if item.priority == val %}selected{% endif %}>{{ label }}</option>
+        {% endfor %}
+      </select>
+    </label>
+    <label class="block">
+      <span class="text-[10px] font-mono uppercase text-cockpit-faint">Urgency</span>
+      <select name="value"
+              class="mt-1 w-full rounded border border-cockpit-border bg-cockpit-bg px-2 py-1.5 text-sm font-mono text-cockpit-text"
+              hx-post="{% url 'item-patch-field' item.pk %}"
+              hx-vals='{"field": "urgency", "return": "drawer"}'
+              hx-include="this"
+              hx-target="#drawer-overlay"
+              hx-swap="innerHTML"
+              hx-trigger="change">
+        {% for val, label in urgency_choices %}
+        <option value="{{ val }}" {% if item.urgency == val %}selected{% endif %}>{{ label }}</option>
+        {% endfor %}
+      </select>
+    </label>
+    <label class="block">
+      <span class="text-[10px] font-mono uppercase text-cockpit-faint">Estimate</span>
+      <input type="text" name="value" value="{{ item.estimated_minutes|duration_h }}"
+             placeholder="1h 30m"
+             class="mt-1 w-full rounded border border-cockpit-border bg-cockpit-bg px-2 py-1.5 text-sm font-mono text-cockpit-text"
+             hx-post="{% url 'item-patch-field' item.pk %}"
+             hx-vals='{"field": "estimated_minutes", "return": "drawer"}'
+             hx-include="this"
+             hx-target="#drawer-overlay"
+             hx-swap="innerHTML"
+             hx-trigger="change">
+      <span class="text-[10px] font-mono text-cockpit-faint">Stored as minutes · e.g. 45m, 2h, 1d</span>
+    </label>
+    <div>
+      <span class="text-[10px] font-mono uppercase text-cockpit-faint">Time spent</span>
+      <div class="mt-1 text-sm font-mono text-cockpit-text">{{ spent.total_label }}</div>
+      <div class="text-[10px] font-mono text-cockpit-faint">
+        timer {{ spent.timer_label }}
+        {% if spent.manual_seconds %} · manual {{ spent.manual_label }}{% endif %}
+      </div>
+    </div>
+    <label class="block col-span-2">
+      <span class="text-[10px] font-mono uppercase text-cockpit-faint">Due</span>
+      <input type="datetime-local" name="value" value="{{ due_at_local }}"
+             class="mt-1 w-full rounded border border-cockpit-border bg-cockpit-bg px-2 py-1.5 text-sm font-mono text-cockpit-text"
+             hx-post="{% url 'item-patch-field' item.pk %}"
+             hx-vals='{"field": "due_at", "return": "drawer"}'
+             hx-include="this"
+             hx-target="#drawer-overlay"
+             hx-swap="innerHTML"
+             hx-trigger="change">
+    </label>
+    <label class="block col-span-2">
+      <span class="text-[10px] font-mono uppercase text-cockpit-faint">External URL</span>
+      <input type="url" name="value" value="{{ item.external_url }}" placeholder="https://"
+             class="mt-1 w-full rounded border border-cockpit-border bg-cockpit-bg px-2 py-1.5 text-sm font-mono text-cockpit-text"
+             hx-post="{% url 'item-patch-field' item.pk %}"
+             hx-vals='{"field": "external_url", "return": "drawer"}'
+             hx-include="this"
+             hx-target="#drawer-overlay"
+             hx-swap="innerHTML"
+             hx-trigger="change delay:400ms">
+    </label>
+  </div>
+
+  <form hx-post="{% url 'item-add-time' item.pk %}"
+        hx-target="#drawer-overlay"
+        hx-swap="innerHTML"
+        class="rounded-lg border border-cockpit-border/60 p-3 space-y-2">
+    {% csrf_token %}
+    <div class="text-[10px] font-mono uppercase tracking-widest text-cockpit-faint">Add time</div>
+    <p class="text-[11px] text-cockpit-faint">Offline / errand work — does not create a focus session.</p>
+    <div class="flex flex-wrap gap-2 items-end">
+      <label class="block min-w-[7rem] flex-1">
+        <span class="text-[10px] font-mono uppercase text-cockpit-faint">Duration</span>
+        <input type="text" name="duration" placeholder="45m or 1h 30m" required
+               class="mt-1 w-full rounded border border-cockpit-border bg-cockpit-bg px-2 py-1.5 text-sm font-mono text-cockpit-text">
+      </label>
+      <label class="block min-w-[10rem] flex-[2]">
+        <span class="text-[10px] font-mono uppercase text-cockpit-faint">Note (optional)</span>
+        <input type="text" name="note" placeholder="Errand, offline burst…"
+               class="mt-1 w-full rounded border border-cockpit-border bg-cockpit-bg px-2 py-1.5 text-sm text-cockpit-text">
+      </label>
+      <button type="submit"
+              class="rounded border border-cockpit-accent/50 px-3 py-1.5 text-xs font-mono text-cockpit-accent-bright hover:bg-cockpit-accent/10">
+        Add
+      </button>
+    </div>
+  </form>
+
+  <div>
+    <label class="text-[10px] font-mono uppercase text-cockpit-faint">Notes</label>
+    <textarea name="value" rows="4" id="drawer-item-notes-{{ item.pk }}"
+              class="mt-1 w-full rounded border border-cockpit-border bg-cockpit-bg/50 px-3 py-2 text-sm text-cockpit-text font-mono"
+              hx-post="{% url 'item-patch-field' item.pk %}"
+              hx-vals='{"field": "notes", "return": "drawer"}'
+              hx-include="this"
+              hx-target="#drawer-overlay"
+              hx-swap="innerHTML"
+              hx-trigger="change delay:600ms"
+              hx-preserve>{{ item.notes }}</textarea>
+  </div>
+
+  <div class="flex flex-wrap gap-2 pt-2 border-t border-cockpit-border">
+    <form hx-post="{% url 'focus-start' item.pk %}" hx-target="#active-focus-card" hx-swap="outerHTML">
+      {% csrf_token %}
+      <button type="submit" class="rounded border border-cockpit-accent/50 px-3 py-1.5 text-xs font-mono text-cockpit-accent-bright hover:bg-cockpit-accent/10">Start focus</button>
+    </form>
+    <form hx-post="{% url 'focus-complete-item' item.pk %}" hx-target="#active-focus-card" hx-swap="outerHTML">
+      {% csrf_token %}
+      <button type="submit" class="rounded border border-cockpit-border px-3 py-1.5 text-xs font-mono text-cockpit-muted hover:text-cockpit-text {% if item.has_unmet_dependencies %}opacity-40{% endif %}"
+              {% if item.has_unmet_dependencies %}disabled{% endif %}>Complete</button>
+    </form>
+  </div>
+
+  {% if item.container_links.all %}
+  <div>
+    <div class="text-[10px] font-mono uppercase text-cockpit-faint mb-1">Homes</div>
+    <ul class="text-xs font-mono text-cockpit-muted space-y-0.5">
+      {% for link in item.container_links.all %}
+      <li>#{{ link.container.slug }}{% if link.is_primary %} <span class="text-cockpit-accent">primary</span>{% endif %}</li>
+      {% endfor %}
+    </ul>
+  </div>
+  {% endif %}
+</div>

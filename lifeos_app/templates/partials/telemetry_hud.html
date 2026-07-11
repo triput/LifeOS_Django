@@ -1,0 +1,39 @@
+<div id="telemetry-hud" class="space-y-3">
+  <div>
+    <div class="text-[10px] font-mono uppercase tracking-widest text-cockpit-faint mb-1">Weather</div>
+    {% if weather.error and weather.temperature is None %}
+      <p class="text-sm text-cockpit-muted">{{ weather.condition_label }}</p>
+    {% else %}
+      <div class="font-display text-2xl {% if weather_band %}{% else %}text-cockpit-text{% endif %}"
+           {% if weather_band %}style="color: {{ weather_band.color }}"{% endif %}>
+        {{ weather.temperature_display }}
+      </div>
+      <div class="mt-0.5 text-sm text-cockpit-muted">
+        {{ weather.condition_label }}
+        {% if weather_band %}
+        <span class="font-mono text-[10px]" style="color: {{ weather_band.color }}">· {{ weather_band.label }}</span>
+        {% endif %}
+      </div>
+      <div class="mt-1 text-xs font-mono text-cockpit-faint">
+        {% if weather.humidity is not None %}Humidity {{ weather.humidity }}%{% endif %}
+        {% if weather.wind_display %} · Wind {{ weather.wind_display }}{% endif %}
+      </div>
+    {% endif %}
+    <div class="mt-1 text-[10px] font-mono text-cockpit-faint">
+      via {{ weather.provider|default:weather_provider }}
+    </div>
+  </div>
+
+  <div class="border-t border-cockpit-border/60 pt-2">
+    <div class="text-[10px] font-mono uppercase tracking-widest text-cockpit-faint mb-1">Space weather</div>
+    <p class="text-sm {% if kp_band %}{% else %}text-cockpit-muted{% endif %}"
+       {% if kp_band %}style="color: {{ kp_band.color }}"{% endif %}>
+      {{ space_weather.display }}
+      {% if kp_band %}<span class="font-mono text-[10px]"> · {{ kp_band.label }}</span>{% endif %}
+    </p>
+  </div>
+
+  <p class="text-xs font-mono text-cockpit-faint">
+    {{ location_name }} · {{ timezone }}
+  </p>
+</div>

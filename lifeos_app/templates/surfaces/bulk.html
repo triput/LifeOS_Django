@@ -1,0 +1,235 @@
+{% extends "base_shell.html" %}
+{% block title %}LifeOS · Bulk Add{% endblock %}
+{% block canvas %}
+<div class="space-y-5" id="bulk-page"
+     x-data="lifeosBulkGrid()">
+  <header class="flex flex-col lg:flex-row lg:items-end lg:justify-between gap-3">
+    <div>
+      <h1 class="font-display text-2xl text-cockpit-text tracking-tight">Bulk Add</h1>
+      <p class="mt-1 text-sm text-cockpit-muted max-w-2xl">
+        Create many containers and items in one pass — fill the grid, paste from Sheets, or upload CSV.
+        Parent may be an existing <span class="font-mono text-cockpit-faint">#slug</span> or a within-batch
+        <span class="font-mono text-cockpit-faint">row_id</span>.
+      </p>
+    </div>
+    <div class="flex flex-wrap gap-2 text-xs font-mono">
+      <a href="{% url 'bulk-template-csv' %}"
+         class="rounded border border-cockpit-border px-3 py-1.5 text-cockpit-muted hover:text-cockpit-accent-bright hover:border-cockpit-accent/50">
+        Download template CSV
+      </a>
+      <a href="{% url 'canvas-matrix' %}"
+         class="rounded border border-cockpit-border px-3 py-1.5 text-cockpit-muted hover:text-cockpit-text">
+        Back to Matrix
+      </a>
+    </div>
+  </header>
+
+  {% if notice %}
+  <p class="text-sm font-mono {% if report and report.failed %}text-orange-400/90{% else %}text-cockpit-accent-bright{% endif %}"
+     id="bulk-notice">{{ notice }}</p>
+  {% endif %}
+
+  <section class="rounded-xl border border-cockpit-border bg-cockpit-panel/40 p-3 space-y-3">
+    <div class="flex flex-wrap items-center justify-between gap-2">
+      <h2 class="text-[10px] font-mono uppercase tracking-widest text-cockpit-faint">Spreadsheet</h2>
+      <div class="flex flex-wrap gap-2 text-xs font-mono">
+        <button type="button" @click="addRow()"
+                class="rounded border border-cockpit-border px-2 py-1 text-cockpit-muted hover:text-cockpit-accent-bright">
+          + Row
+        </button>
+        <button type="button" @click="clearEmpty()"
+                class="rounded border border-cockpit-border px-2 py-1 text-cockpit-muted hover:text-cockpit-text">
+          Clear empty
+        </button>
+      </div>
+    </div>
+
+    <div class="overflow-x-auto rounded-lg border border-cockpit-border"
+         @paste.prevent="onPaste($event)">
+      <table class="min-w-[1100px] w-full text-left text-xs">
+        <thead class="bg-cockpit-panel/80 text-[10px] font-mono uppercase tracking-widest text-cockpit-faint">
+          <tr>
+            <th class="px-2 py-2 w-8">#</th>
+            <template x-for="col in columns" :key="col">
+              <th class="px-2 py-2" x-text="col"></th>
+            </template>
+            <th class="px-2 py-2 w-10"></th>
+          </tr>
+        </thead>
+        <tbody>
+          <template x-for="(row, idx) in rows" :key="idx">
+            <tr class="border-t border-cockpit-border/50 hover:bg-cockpit-bg/40">
+              <td class="px-2 py-1 font-mono text-cockpit-faint" x-text="idx + 1"></td>
+              <template x-for="col in columns" :key="col">
+                <td class="px-1 py-1">
+                  <input type="text"
+                         class="w-full min-w-[4.5rem] rounded border border-cockpit-border/70 bg-cockpit-bg px-1.5 py-1 font-mono text-[11px] text-cockpit-text"
+                         x-model="row[col]"
+                         :placeholder="placeholderFor(col)">
+                </td>
+              </template>
+              <td class="px-1 py-1">
+                <button type="button" class="text-cockpit-faint hover:text-orange-400" @click="removeRow(idx)" title="Remove row">×</button>
+              </td>
+            </tr>
+          </template>
+        </tbody>
+      </table>
+    </div>
+    <p class="text-[11px] text-cockpit-faint">
+      Tip: focus the grid and paste TSV/CSV from Excel or Sheets — rows replace empty trailing cells / append.
+    </p>
+
+    <form id="bulk-commit-form"
+          method="post"
+          action="{% url 'bulk-commit' %}"
+          hx-post="{% url 'bulk-commit' %}"
+          hx-target="#bulk-report"
+          hx-swap="innerHTML"
+          class="flex flex-wrap items-center gap-3">
+      {% csrf_token %}
+      <input type="hidden" name="rows_json" :value="JSON.stringify(filledRows())">
+      <label class="flex items-center gap-2 text-xs font-mono text-cockpit-muted">
+        <input type="checkbox" name="all_or_nothing" value="1"
+               class="rounded border-cockpit-border">
+        All-or-nothing
+      </label>
+      <button type="submit"
+              class="rounded border border-cockpit-accent/60 bg-cockpit-accent/10 px-4 py-1.5 text-sm font-mono text-cockpit-accent-bright hover:bg-cockpit-accent/20">
+        Commit rows
+      </button>
+    </form>
+  </section>
+
+  <section class="grid md:grid-cols-2 gap-4">
+    <form method="post" action="{% url 'bulk-preview' %}" enctype="multipart/form-data"
+          class="rounded-xl border border-cockpit-border bg-cockpit-panel/40 p-4 space-y-3">
+      {% csrf_token %}
+      <h2 class="text-[10px] font-mono uppercase tracking-widest text-cockpit-faint">Upload CSV</h2>
+      <input type="file" name="file" accept=".csv,text/csv,text/plain"
+             class="block w-full text-xs font-mono text-cockpit-muted file:mr-3 file:rounded file:border-0 file:bg-cockpit-bg file:px-3 file:py-1.5 file:text-cockpit-text">
+      <button type="submit"
+              class="rounded border border-cockpit-border px-3 py-1.5 text-xs font-mono text-cockpit-muted hover:text-cockpit-accent-bright">
+        Preview into grid
+      </button>
+    </form>
+
+    <form method="post" action="{% url 'bulk-preview' %}"
+          class="rounded-xl border border-cockpit-border bg-cockpit-panel/40 p-4 space-y-3">
+      {% csrf_token %}
+      <h2 class="text-[10px] font-mono uppercase tracking-widest text-cockpit-faint">Paste TSV / CSV</h2>
+      <textarea name="paste_text" rows="5" placeholder="kind,title,type,parent&#10;container,My Epic,EPIC,&#10;item,Task one,TASK,r1"
+                class="w-full rounded border border-cockpit-border bg-cockpit-bg px-2 py-1.5 font-mono text-[11px] text-cockpit-text"></textarea>
+      <button type="submit"
+              class="rounded border border-cockpit-border px-3 py-1.5 text-xs font-mono text-cockpit-muted hover:text-cockpit-accent-bright">
+        Preview into grid
+      </button>
+    </form>
+  </section>
+
+  <div id="bulk-report">
+    {% include "partials/bulk_report.html" %}
+  </div>
+
+  <details class="rounded-xl border border-cockpit-border bg-cockpit-panel/30 p-4 text-sm text-cockpit-muted">
+    <summary class="cursor-pointer font-mono text-xs uppercase tracking-widest text-cockpit-faint">Column reference</summary>
+    <ul class="mt-3 space-y-1 font-mono text-[11px] list-disc pl-5">
+      <li><span class="text-cockpit-text">kind</span> — container | item</li>
+      <li><span class="text-cockpit-text">title</span> — required</li>
+      <li><span class="text-cockpit-text">type</span> — EPIC/PROJECT/… or TASK/LEARNING_TASK/…</li>
+      <li><span class="text-cockpit-text">parent</span> — #slug or batch row_id (items: primary home)</li>
+      <li><span class="text-cockpit-text">estimate</span> — 30, 1h, 1d 2h (items)</li>
+      <li><span class="text-cockpit-text">tags</span> — comma or semicolon separated</li>
+    </ul>
+  </details>
+</div>
+
+<script>
+window.__lifeosBulkInitial = {{ grid_rows_json|safe }};
+window.__lifeosBulkColumns = {{ columns_json|safe }};
+
+function lifeosBulkGrid() {
+  var columns = window.__lifeosBulkColumns || [];
+  function blankRow() {
+    var row = {};
+    columns.forEach(function (c) { row[c] = ""; });
+    return row;
+  }
+  function cloneRows(src) {
+    return (src || []).map(function (r) {
+      var row = blankRow();
+      columns.forEach(function (c) { row[c] = (r && r[c]) || ""; });
+      return row;
+    });
+  }
+  return {
+    columns: columns,
+    rows: cloneRows(window.__lifeosBulkInitial),
+    placeholderFor: function (col) {
+      if (col === "kind") return "container|item";
+      if (col === "parent") return "#slug or r1";
+      if (col === "row_id") return "r1";
+      return "";
+    },
+    addRow: function () { this.rows.push(blankRow()); },
+    removeRow: function (idx) { this.rows.splice(idx, 1); if (!this.rows.length) this.rows.push(blankRow()); },
+    clearEmpty: function () {
+      var next = this.rows.filter(function (r) {
+        return columns.some(function (c) { return (r[c] || "").trim(); });
+      });
+      this.rows = next.length ? next : [blankRow()];
+    },
+    filledRows: function () {
+      return this.rows.filter(function (r) {
+        return columns.some(function (c) { return (r[c] || "").trim(); });
+      });
+    },
+    onPaste: function (event) {
+      var text = (event.clipboardData && event.clipboardData.getData("text")) || "";
+      if (!text.trim()) return;
+      var lines = text.replace(/\r\n/g, "\n").replace(/\r/g, "\n").trim().split("\n");
+      if (!lines.length) return;
+      var delim = lines[0].indexOf("\t") >= 0 ? "\t" : ",";
+      var firstCells = lines[0].split(delim).map(function (c) { return c.trim().toLowerCase(); });
+      var headerMap = null;
+      var start = 0;
+      if (firstCells.indexOf("kind") >= 0 || firstCells.indexOf("title") >= 0) {
+        headerMap = firstCells;
+        start = 1;
+      }
+      var parsed = [];
+      for (var i = start; i < lines.length; i++) {
+        var cells = lines[i].split(delim);
+        var row = blankRow();
+        if (headerMap) {
+          headerMap.forEach(function (h, idx) {
+            var key = h;
+            if (columns.indexOf(key) < 0) {
+              if (key === "name") key = "title";
+              if (key === "id" || key === "row") key = "row_id";
+            }
+            if (columns.indexOf(key) >= 0) row[key] = (cells[idx] || "").trim();
+          });
+        } else {
+          // kind,title,type,parent… (no row_id)
+          var offset = 1;
+          row.kind = (cells[0] || "").trim();
+          row.title = (cells[1] || "").trim();
+          for (var c = 2; c < cells.length && offset + c - 1 < columns.length; c++) {
+            row[columns[offset + c - 1]] = (cells[c] || "").trim();
+          }
+        }
+        if (columns.some(function (c) { return (row[c] || "").trim(); })) parsed.push(row);
+      }
+      if (!parsed.length) return;
+      // Replace trailing empty rows, then append.
+      while (this.rows.length && !columns.some(function (c) { return (this.rows[this.rows.length - 1][c] || "").trim(); }.bind(this))) {
+        this.rows.pop();
+      }
+      parsed.forEach(function (r) { this.rows.push(r); }.bind(this));
+      if (!this.rows.length) this.rows.push(blankRow());
+    }
+  };
+}
+</script>
+{% endblock %}

@@ -1,0 +1,55 @@
+<aside id="plan-calendar-filters" class="rounded-xl border border-cockpit-border bg-cockpit-panel/40 p-3 space-y-3 h-fit">
+  <div class="text-[10px] font-mono uppercase tracking-widest text-cockpit-faint">Sources</div>
+  <p class="text-[10px] text-cockpit-faint">Display only — does not change sync.</p>
+  <ul class="space-y-2">
+    {% for src in source_filters %}
+    <li>
+      {% if src.kind == "allocations" %}
+      <form hx-post="{% url 'plan-calendar-allocations-toggle' %}"
+            hx-target="#plan-calendar-page"
+            hx-swap="outerHTML"
+            class="flex items-center gap-2">
+        {% csrf_token %}
+        <input type="hidden" name="view" value="{{ grid_view }}">
+        <input type="hidden" name="day" value="{{ grid_anchor|date:'Y-m-d' }}">
+        <input type="checkbox" name="show_allocations" value="on"
+               class="rounded border-cockpit-border"
+               {% if src.enabled %}checked{% endif %}
+               onchange="this.form.requestSubmit()">
+        <span class="w-2 h-2 rounded-full shrink-0" style="background: {{ src.color }}"></span>
+        <span class="text-xs text-cockpit-muted truncate">{{ src.label }}</span>
+      </form>
+      {% else %}
+      <div class="flex items-center gap-2">
+        <form hx-post="{% url 'plan-calendar-display-toggle' src.calendar_pk %}"
+              hx-target="#plan-calendar-page"
+              hx-swap="outerHTML"
+              class="flex items-center gap-2 min-w-0 flex-1">
+          {% csrf_token %}
+          <input type="hidden" name="view" value="{{ grid_view }}">
+          <input type="hidden" name="day" value="{{ grid_anchor|date:'Y-m-d' }}">
+          <input type="checkbox" name="display_enabled" value="on"
+                 class="rounded border-cockpit-border"
+                 {% if src.enabled %}checked{% endif %}
+                 onchange="this.form.requestSubmit()">
+          <span class="text-xs text-cockpit-muted truncate" title="{{ src.label }}">{{ src.label }}</span>
+        </form>
+        <input type="color"
+               name="color"
+               value="{{ src.color }}"
+               title="Calendar color"
+               class="h-5 w-5 cursor-pointer rounded border border-cockpit-border bg-transparent p-0 shrink-0"
+               hx-post="{% url 'calendar-color' src.calendar_pk %}"
+               hx-trigger="change"
+               hx-target="#plan-calendar-page"
+               hx-swap="outerHTML"
+               hx-vals='{"return": "grid", "view": "{{ grid_view }}", "day": "{{ grid_anchor|date:'Y-m-d' }}"}'
+               hx-include="this, [name=csrfmiddlewaretoken]">
+      </div>
+      {% endif %}
+    </li>
+    {% empty %}
+    <li class="text-xs text-cockpit-faint">No calendars discovered yet. Connect Google or Outlook on the day Planner.</li>
+    {% endfor %}
+  </ul>
+</aside>

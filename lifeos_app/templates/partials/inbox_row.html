@@ -1,0 +1,26 @@
+<div id="inbox-row-{{ item.pk }}" class="rounded-lg border border-zinc-800 bg-zinc-900/40 p-3">
+  {% if error %}<p class="text-xs text-red-400 mb-2">{{ error }}</p>{% endif %}
+  <div class="text-sm text-zinc-200 mb-2">{{ item.title }}</div>
+  <form class="flex flex-wrap gap-2 items-end"
+        hx-post="{% url 'inbox-triage' item.pk %}"
+        hx-target="#inbox-row-{{ item.pk }}"
+        hx-swap="outerHTML">
+    {% csrf_token %}
+    <label class="flex-1 min-w-[140px]">
+      <span class="block text-[10px] font-mono uppercase text-zinc-600 mb-1">Container</span>
+      <select name="container_slug" required class="w-full rounded border border-zinc-700 bg-zinc-950 px-2 py-1.5 text-sm text-zinc-300">
+        <option value="">— pick —</option>
+        {% for c in containers %}
+          {% if c.slug != "inbox" %}
+          <option value="{{ c.slug }}">{{ c.title }} (#{{ c.slug }})</option>
+          {% endif %}
+        {% endfor %}
+      </select>
+    </label>
+    <label class="flex-1 min-w-[120px]">
+      <span class="block text-[10px] font-mono uppercase text-zinc-600 mb-1">Tags</span>
+      <input type="text" name="tags" placeholder="@tag …" class="w-full rounded border border-zinc-700 bg-zinc-950 px-2 py-1.5 text-sm text-zinc-300 font-mono">
+    </label>
+    <button type="submit" class="rounded-lg border border-emerald-800 bg-emerald-950/40 px-4 py-1.5 text-sm font-mono text-emerald-400 hover:bg-emerald-900/30">Process</button>
+  </form>
+</div>

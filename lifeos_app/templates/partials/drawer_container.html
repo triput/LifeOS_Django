@@ -1,0 +1,193 @@
+<div class="p-5 space-y-4" id="drawer-container-{{ container.pk }}">
+  <div class="flex items-start justify-between gap-3">
+    <div class="min-w-0 flex-1">
+      <div class="text-[10px] font-mono uppercase tracking-widest text-cockpit-muted mb-1">{{ container.get_container_type_display }}</div>
+      <input type="text" name="value" value="{{ container.title }}"
+             class="w-full font-display text-xl text-cockpit-text leading-tight bg-transparent border-b border-transparent focus:border-cockpit-accent outline-none py-0.5"
+             hx-post="{% url 'container-patch-field' container.pk %}"
+             hx-vals='{"field": "title", "return": "drawer"}'
+             hx-include="this"
+             hx-target="#drawer-overlay"
+             hx-swap="innerHTML"
+             hx-trigger="change delay:400ms"
+             aria-label="Title">
+      <p class="mt-1 text-xs font-mono text-cockpit-faint">#{{ container.slug }} · {{ item_count }} items</p>
+      {% if container.domain %}
+      <div class="mt-2">{% include "partials/color_chip.html" with color=container.domain.color label=container.domain.name %}</div>
+      {% endif %}
+    </div>
+    <div class="flex gap-1 shrink-0">
+      <form hx-post="{% url 'drawer-minimize' %}" hx-target="#dock-bar" hx-swap="innerHTML" hx-on::after-request="lifeosCloseDrawer()">
+        {% csrf_token %}
+        <input type="hidden" name="kind" value="container">
+        <input type="hidden" name="id" value="{{ container.pk }}">
+        <input type="hidden" name="label" value="{{ container.title }}">
+        <button type="submit" class="text-xs font-mono text-cockpit-faint hover:text-cockpit-text px-2 py-1">—</button>
+      </form>
+      <button type="button" class="text-xs font-mono text-cockpit-faint hover:text-cockpit-text px-2 py-1" onclick="lifeosCloseDrawer()">✕</button>
+    </div>
+  </div>
+
+  {% if drawer_error %}
+  <div class="rounded border border-red-900/50 bg-red-950/30 px-3 py-2 text-xs text-red-400 font-mono">{{ drawer_error }}</div>
+  {% endif %}
+  {% if drawer_notice %}
+  <div class="rounded border border-cockpit-accent/30 bg-cockpit-accent/5 px-3 py-2 text-xs text-cockpit-accent-bright font-mono">{{ drawer_notice }}</div>
+  {% endif %}
+
+  <div class="grid grid-cols-2 gap-3 text-sm">
+    <label class="block">
+      <span class="text-[10px] font-mono uppercase text-cockpit-faint">PARA</span>
+      <select name="value"
+              class="mt-1 w-full rounded border border-cockpit-border bg-cockpit-bg px-2 py-1.5 text-sm font-mono text-cockpit-text"
+              hx-post="{% url 'container-patch-field' container.pk %}"
+              hx-vals='{"field": "para_state", "return": "drawer"}'
+              hx-include="this"
+              hx-target="#drawer-overlay"
+              hx-swap="innerHTML"
+              hx-trigger="change">
+        {% for val, label in para_choices %}
+        <option value="{{ val }}" {% if container.para_state == val %}selected{% endif %}>{{ label }}</option>
+        {% endfor %}
+      </select>
+    </label>
+    <label class="block">
+      <span class="text-[10px] font-mono uppercase text-cockpit-faint">Priority</span>
+      <select name="value"
+              class="mt-1 w-full rounded border border-cockpit-border bg-cockpit-bg px-2 py-1.5 text-sm font-mono text-cockpit-text"
+              hx-post="{% url 'container-patch-field' container.pk %}"
+              hx-vals='{"field": "priority", "return": "drawer"}'
+              hx-include="this"
+              hx-target="#drawer-overlay"
+              hx-swap="innerHTML"
+              hx-trigger="change">
+        {% for val, label in priority_choices %}
+        <option value="{{ val }}" {% if container.priority == val %}selected{% endif %}>{{ label }}</option>
+        {% endfor %}
+      </select>
+    </label>
+    <label class="block">
+      <span class="text-[10px] font-mono uppercase text-cockpit-faint">Urgency</span>
+      <select name="value"
+              class="mt-1 w-full rounded border border-cockpit-border bg-cockpit-bg px-2 py-1.5 text-sm font-mono text-cockpit-text"
+              hx-post="{% url 'container-patch-field' container.pk %}"
+              hx-vals='{"field": "urgency", "return": "drawer"}'
+              hx-include="this"
+              hx-target="#drawer-overlay"
+              hx-swap="innerHTML"
+              hx-trigger="change">
+        {% for val, label in urgency_choices %}
+        <option value="{{ val }}" {% if container.urgency == val %}selected{% endif %}>{{ label }}</option>
+        {% endfor %}
+      </select>
+    </label>
+    <div>
+      <span class="text-[10px] font-mono uppercase text-cockpit-faint">Time spent</span>
+      <div class="mt-1 text-sm font-mono text-cockpit-text">{{ spent.total_label }}</div>
+      <div class="text-[10px] font-mono text-cockpit-faint">
+        leaves {{ spent.timer_label }}{% if spent.manual_seconds %}+{{ spent.manual_label }}{% endif %}
+        {% if spent.own_extra_seconds %} · container {{ spent.own_extra_label }}{% endif %}
+      </div>
+    </div>
+  </div>
+
+  <form hx-post="{% url 'container-add-time' container.pk %}"
+        hx-target="#drawer-overlay"
+        hx-swap="innerHTML"
+        class="rounded-lg border border-cockpit-border/60 p-3 space-y-2">
+    {% csrf_token %}
+    <div class="text-[10px] font-mono uppercase tracking-widest text-cockpit-faint">Add time</div>
+    <p class="text-[11px] text-cockpit-faint">Credits this project/epic — not a focus session.</p>
+    <div class="flex flex-wrap gap-2 items-end">
+      <label class="block min-w-[7rem] flex-1">
+        <span class="text-[10px] font-mono uppercase text-cockpit-faint">Duration</span>
+        <input type="text" name="duration" placeholder="45m or 1h 30m" required
+               class="mt-1 w-full rounded border border-cockpit-border bg-cockpit-bg px-2 py-1.5 text-sm font-mono text-cockpit-text">
+      </label>
+      <label class="block min-w-[10rem] flex-[2]">
+        <span class="text-[10px] font-mono uppercase text-cockpit-faint">Note (optional)</span>
+        <input type="text" name="note" placeholder="Meeting, offline work…"
+               class="mt-1 w-full rounded border border-cockpit-border bg-cockpit-bg px-2 py-1.5 text-sm text-cockpit-text">
+      </label>
+      <button type="submit"
+              class="rounded border border-cockpit-accent/50 px-3 py-1.5 text-xs font-mono text-cockpit-accent-bright hover:bg-cockpit-accent/10">
+        Add
+      </button>
+    </div>
+  </form>
+
+  <div>
+    <label class="text-[10px] font-mono uppercase text-cockpit-faint">Notes</label>
+    <textarea name="value" rows="4" id="drawer-container-notes-{{ container.pk }}"
+              class="mt-1 w-full rounded border border-cockpit-border bg-cockpit-bg/50 px-3 py-2 text-sm text-cockpit-text font-mono"
+              hx-post="{% url 'container-patch-field' container.pk %}"
+              hx-vals='{"field": "notes", "return": "drawer"}'
+              hx-include="this"
+              hx-target="#drawer-overlay"
+              hx-swap="innerHTML"
+              hx-trigger="change delay:600ms"
+              hx-preserve>{{ container.notes }}</textarea>
+  </div>
+
+  {% if container.parent %}
+  <p class="text-xs text-cockpit-faint font-mono">Parent: {{ container.parent.title }}</p>
+  {% endif %}
+
+  {% if show_academy_fields %}
+  <div class="rounded-lg border border-cockpit-border/60 p-3 space-y-3">
+    <div class="text-[10px] font-mono uppercase tracking-widest text-cockpit-faint">Academy</div>
+    <div class="grid grid-cols-2 gap-3 text-sm">
+      <label class="block">
+        <span class="text-[10px] font-mono uppercase text-cockpit-faint">Provider</span>
+        <input type="text" name="value" value="{{ container.provider }}"
+               class="mt-1 w-full rounded border border-cockpit-border bg-cockpit-bg px-2 py-1.5 text-sm text-cockpit-text"
+               hx-post="{% url 'container-patch-field' container.pk %}"
+               hx-vals='{"field": "provider", "return": "drawer"}'
+               hx-include="this"
+               hx-target="#drawer-overlay"
+               hx-swap="innerHTML"
+               hx-trigger="change delay:400ms">
+      </label>
+      <label class="block">
+        <span class="text-[10px] font-mono uppercase text-cockpit-faint">Credit unit</span>
+        <input type="text" name="value" value="{{ container.credit_unit_type }}"
+               class="mt-1 w-full rounded border border-cockpit-border bg-cockpit-bg px-2 py-1.5 text-sm font-mono text-cockpit-text"
+               hx-post="{% url 'container-patch-field' container.pk %}"
+               hx-vals='{"field": "credit_unit_type", "return": "drawer"}'
+               hx-include="this"
+               hx-target="#drawer-overlay"
+               hx-swap="innerHTML"
+               hx-trigger="change delay:400ms">
+      </label>
+      <label class="block">
+        <span class="text-[10px] font-mono uppercase text-cockpit-faint">Credits earned</span>
+        <input type="number" name="value" step="0.1" min="0" value="{{ container.credits_earned }}"
+               class="mt-1 w-full rounded border border-cockpit-border bg-cockpit-bg px-2 py-1.5 text-sm font-mono text-cockpit-text"
+               hx-post="{% url 'container-patch-field' container.pk %}"
+               hx-vals='{"field": "credits_earned", "return": "drawer"}'
+               hx-include="this"
+               hx-target="#drawer-overlay"
+               hx-swap="innerHTML"
+               hx-trigger="change">
+      </label>
+      {% if container.certification %}
+      <div>
+        <span class="text-[10px] font-mono uppercase text-cockpit-faint">Certification</span>
+        <div class="mt-1 text-sm text-cockpit-text">{{ container.certification.name }}{% if container.certification.provider %} · {{ container.certification.provider }}{% endif %}</div>
+      </div>
+      {% endif %}
+      <label class="block col-span-2">
+        <span class="text-[10px] font-mono uppercase text-cockpit-faint">External URL</span>
+        <input type="url" name="value" value="{{ container.external_url }}" placeholder="https://"
+               class="mt-1 w-full rounded border border-cockpit-border bg-cockpit-bg px-2 py-1.5 text-sm font-mono text-cockpit-text"
+               hx-post="{% url 'container-patch-field' container.pk %}"
+               hx-vals='{"field": "external_url", "return": "drawer"}'
+               hx-include="this"
+               hx-target="#drawer-overlay"
+               hx-swap="innerHTML"
+               hx-trigger="change delay:400ms">
+      </label>
+    </div>
+  </div>
+  {% endif %}
+</div>
