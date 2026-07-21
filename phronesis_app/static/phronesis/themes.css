@@ -1,0 +1,193 @@
+/* ==============================================================================
+ * File: phronesis_app/static/phronesis/themes.css
+ * Description: Cockpit theme tokens, rail, status accents, due pulse, a11y utilities
+ * Component: Static / Appearance
+ * ============================================================================== */
+
+/* --- Hybrid Dark (default) — emerald cockpit accent matches auth surfaces --- */
+:root,
+[data-theme="hybrid_dark"] {
+  --cockpit-bg: #0b0f19;
+  --cockpit-panel: #121827;
+  --cockpit-border: #2a3247;
+  --cockpit-text: #e6eaf2;
+  --cockpit-muted: #9aa4b2;
+  --cockpit-faint: #6b7585;
+  --cockpit-accent: #059669;
+  --cockpit-accent-bright: #34d399;
+  --cockpit-indigo: #818cf8;
+  --status-inbox: #9aa4b2;
+  --status-backlog: #64748b;
+  --status-planned: #38bdf8;
+  --status-progress: #34d399;
+  --status-blocked: #f59e0b;
+  --status-completed: #50c878;
+  --due-soon: #fbbf24;
+  --due-overdue: #e0115f;
+  color-scheme: dark;
+}
+
+[data-theme="solarized_dark"] {
+  --cockpit-bg: #002b36;
+  --cockpit-panel: #073642;
+  --cockpit-border: #2e5b66;
+  --cockpit-text: #dde5d8;
+  --cockpit-muted: #93a1a1;
+  --cockpit-faint: #657b83;
+  --cockpit-accent: #a57bd5;
+  --cockpit-accent-bright: #c4a1ea;
+  --cockpit-indigo: #2c6ccc;
+  --status-inbox: #93a1a1;
+  --status-backlog: #839496;
+  --status-planned: #268bd2;
+  --status-progress: #58d189;
+  --status-blocked: #b58900;
+  --status-completed: #859900;
+  --due-soon: #b58900;
+  --due-overdue: #e34e80;
+  color-scheme: dark;
+}
+
+[data-theme="solarized_light"] {
+  --cockpit-bg: #fdf6e3;
+  --cockpit-panel: #eee8d5;
+  --cockpit-border: #d6cbb4;
+  --cockpit-text: #334155;
+  --cockpit-muted: #657b83;
+  --cockpit-faint: #93a1a1;
+  --cockpit-accent: #7f53b3;
+  --cockpit-accent-bright: #5b3a8c;
+  --cockpit-indigo: #1c5db6;
+  --status-inbox: #657b83;
+  --status-backlog: #839496;
+  --status-planned: #268bd2;
+  --status-progress: #3daf69;
+  --status-blocked: #b58900;
+  --status-completed: #586e75;
+  --due-soon: #b58900;
+  --due-overdue: #b2185b;
+  color-scheme: light;
+}
+
+[data-theme="light"] {
+  --cockpit-bg: #f5f7fb;
+  --cockpit-panel: #ffffff;
+  --cockpit-border: #d8dee9;
+  --cockpit-text: #1b2430;
+  --cockpit-muted: #5b6472;
+  --cockpit-faint: #8b93a1;
+  --cockpit-accent: #8e5fc0;
+  --cockpit-accent-bright: #6d3fa3;
+  --cockpit-indigo: #1b63c7;
+  --status-inbox: #5b6472;
+  --status-backlog: #64748b;
+  --status-planned: #0284c7;
+  --status-progress: #3ebb6a;
+  --status-blocked: #d97706;
+  --status-completed: #059669;
+  --due-soon: #d97706;
+  --due-overdue: #c90f56;
+  color-scheme: light;
+}
+
+html,
+body {
+  background-color: var(--cockpit-bg);
+  color: var(--cockpit-text);
+}
+
+/* --- Rail --- */
+.rail-link-idle {
+  color: var(--cockpit-muted);
+}
+.rail-link-idle:hover {
+  color: var(--cockpit-text);
+  background: color-mix(in srgb, var(--cockpit-panel) 80%, transparent);
+}
+.rail-link-active {
+  color: var(--cockpit-accent-bright);
+  background: color-mix(in srgb, var(--cockpit-accent) 14%, transparent);
+  border: 1px solid color-mix(in srgb, var(--cockpit-accent) 40%, transparent);
+}
+
+/* --- Status accent bars --- */
+.accent-bar {
+  background: var(--status-backlog);
+}
+.accent-bar[data-status="INBOX"] { background: var(--status-inbox); }
+.accent-bar[data-status="BACKLOG"] { background: var(--status-backlog); }
+.accent-bar[data-status="PLANNED"] { background: var(--status-planned); }
+.accent-bar[data-status="IN_PROGRESS"] { background: var(--status-progress); }
+.accent-bar[data-status="BLOCKED"] { background: var(--status-blocked); }
+.accent-bar[data-status="COMPLETED"] { background: var(--status-completed); }
+
+/* --- Due pulse wash (Matrix / Board / Horizon) --- */
+@keyframes due-soon-wash {
+  0%, 100% { box-shadow: inset 3px 0 0 var(--due-soon); }
+  50% { box-shadow: inset 3px 0 0 color-mix(in srgb, var(--due-soon) 40%, transparent); }
+}
+@keyframes due-overdue-wash {
+  0%, 100% { box-shadow: inset 3px 0 0 var(--due-overdue); }
+  50% { box-shadow: inset 3px 0 0 color-mix(in srgb, var(--due-overdue) 45%, transparent); }
+}
+[data-due="soon"] {
+  animation: due-soon-wash 2.4s ease-in-out infinite;
+}
+[data-due="overdue"] {
+  animation: due-overdue-wash 1.6s ease-in-out infinite;
+}
+
+/* --- A11y utilities (P5-06) --- */
+.sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border-width: 0;
+}
+
+.skip-link {
+  position: absolute;
+  left: 0.75rem;
+  top: -100%;
+  z-index: 100;
+  padding: 0.5rem 0.75rem;
+  border-radius: 0.5rem;
+  background: var(--cockpit-panel);
+  color: var(--cockpit-accent-bright);
+  border: 1px solid var(--cockpit-border);
+  font-family: "IBM Plex Mono", ui-monospace, monospace;
+  font-size: 0.75rem;
+  text-decoration: none;
+}
+.skip-link:focus {
+  top: 0.75rem;
+}
+
+:focus-visible {
+  outline: 2px solid var(--cockpit-accent-bright);
+  outline-offset: 2px;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+  [data-due="soon"],
+  [data-due="overdue"] {
+    animation: none;
+    box-shadow: inset 3px 0 0 var(--due-soon);
+  }
+  [data-due="overdue"] {
+    box-shadow: inset 3px 0 0 var(--due-overdue);
+  }
+}

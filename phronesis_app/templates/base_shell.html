@@ -6,6 +6,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <meta name="csrf-token" content="{{ csrf_token }}">
   <title>{% block title %}Phronesis{% endblock %}</title>
+  <link rel="icon" href="{% static 'phronesis/favicon.svg' %}" type="image/svg+xml">
   <script src="https://cdn.tailwindcss.com"></script>
   <script src="https://unpkg.com/htmx.org@2.0.4"></script>
   <script defer src="https://unpkg.com/alpinejs@3.14.8/dist/cdn.min.js"></script>
@@ -78,7 +79,7 @@
                   aria-label="Toggle navigation rail"
                   title="Toggle rail">☰</button>
           <a href="{% url 'home' %}" class="font-display text-xl tracking-tight text-cockpit-text hover:text-cockpit-accent transition">Phronesis</a>
-          <span class="hidden sm:inline text-xs font-mono text-cockpit-muted uppercase tracking-widest">Cockpit</span>
+          <span class="hidden sm:inline text-xs font-mono text-cockpit-faint tracking-wide">Organon by LiveBytes</span>
         </div>
         <div class="flex items-center gap-3 text-sm">
           <span class="hidden md:inline font-mono text-cockpit-muted">{% now "D, M j" %}</span>

@@ -14,9 +14,9 @@ secrets.json
 
 # --- Django/Database ---
 *.sqlite3
-staticfiles/
+/staticfiles/
+/static/
 media/
-static/
 *.log
 
 # --- OS/IDE Junk ---
